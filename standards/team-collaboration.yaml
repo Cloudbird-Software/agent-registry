@@ -1,0 +1,189 @@
+version: 0.1-draft          # 草案：待 owner 征求独立意见后修订，不合并
+# ============================================================================
+# Team Collaboration Standard —— 协作范式 / 通信模式 / 团队组装（草案）
+#
+# 依据：openjiuwen 预置三范式（主从含 fan-out、agent-as-tool、handoff）
+#      + 两种通信（orchestrator 转交 A2A、频道-订阅）。
+# 本文件回答两个问题：
+#   Q1 范式与通信是否需要新范式？——结论：协作范式 +1（artifact-mediated），
+#      通信范式不加但补"信封契约"；handoff 增设语义子类型 escalation。
+#   Q2 在范式之上，团队如何定义与组装？（第三部分）
+# ============================================================================
+
+# ══════════════════════════════════════════════════════════════════════════
+# 第一部分 协作范式（collaboration paradigms）
+# ══════════════════════════════════════════════════════════════════════════
+# 统一视角：一切协作范式本质是【上下文传递策略】（context economics）——
+#   谁保留任务全貌、谁只拿切片、结论以什么形态过界。
+# 这把 openjiuwen 三范式纳入同一坐标系，也暴露了第四种的空位：
+
+paradigms:
+
+  subordinate:                       # openjiuwen: 主从（含 fan-out）
+    context_strategy: 切片（slice）  # 主保留全局，从只拿工作卡（含验收引用+预算）
+    who_leads: scheduler 机制（v3：非 LLM）
+    fan_out: true                    # 同构从节点（builder 池）并发分派，结果聚合
+    use_when: 批量同构任务（多卡并行实现）；从节点无需全局视野
+    failure_mode: 从节点上下文过窄 → 卡自含验收引用与回溯链（卡=上下文契约）
+    examples: [scheduler→builder 池按卡分派]
+
+  agent_as_tool:                     # openjiuwen: agent-as-tool
+    context_strategy: 压缩（compress）# 调用方保留任务上下文；被调方自消化全文，只回结论+引用
+    contract: io_contract 单次往返   # 输入 schema→输出 schema；输出封板不可二次加工（CT-RES-003）
+    use_when: 上下文经济（researcher）；把"判断"外包但决策权留在调用方
+    failure_mode: 往返膨胀/结论污染 → 体积受 io_contract 约束 + source_class 分级过界
+    examples: [builder/planner → researcher 检索]
+
+  handoff:                           # openjiuwen: handoff
+    context_strategy: 移交（hand-over）# 调用方放弃上下文，被调方全量接管；移交包=任务+最小充分上下文
+    use_when: 阶段切换（计划→执行）；执行权整体转移
+    rules:
+      - 移交包最小充分：只带卡+验收引用+决策摘要，不带草稿记忆（hermetic 方向）
+      - 移交后原方退出（不并行指挥——单一执行权）
+    subtypes:
+      escalation:                    # 【新增语义子类型，非新范式】
+        semantics: 向上移交+不可拒绝 # "我们俩做不了决定，请上级裁"——区别于普通移交的"我不想做了"
+        to: [judge（域内）, owner（越域/管辖枚举外）]
+        carrier: evidence-pack artifact（v3：证据不经争议方转述）
+        anti_pattern: escalation 携带己方倾向性摘要（=给仲裁者注入）→ judge 摘录双方主张自证据包
+
+  artifact_mediated:                 # 【新增第一类范式】openjiuwen 三范式都是消息中心；缺这个
+    context_strategy: 共享（share）  # 上下文不点对点传递，落共享制品；各参与方异步读写同一物
+    medium: [git PR, 事件流, 数据层 findings/cards, 团队工作区]
+    use_when: 异步解耦——参与方互不知道对方何时来；协作通过制品状态推进而非消息往返
+    examples:
+      - builder 提 PR ↔ verifier 判决 ↔ integrator 合并：三方零实时协调，全走 PR 状态机
+      - adversary 写 findings ↔ owner 周审：生产消费完全解耦
+      - curator 归档审核：handoff 资产到位才处理，无消息催促
+    why_first_class: 它是我们体系的事实主流（PR-based 交付/审计/归档全是它）；
+      声明为一类范式后，团队装配才能显式声明"这对协作走制品不走消息"
+    failure_mode: 制品冲突/陈读 → version_control 强制（团队工作区已声明）+ 事件流通知变更
+
+# 范式选择决策表（AI 装配团队时按此路由）：
+#   需要判断但不要全局上下文？        → agent_as_tool（researcher）
+#   阶段责任整体切换？                → handoff（planner→builder）
+#   双方僵持需要第三方裁？            → handoff.escalation（judge/owner）
+#   批量同构并行？                    → subordinate + fan_out
+#   参与方异步、以物为界？            → artifact_mediated（PR/事件/归档）
+#   一切都不是（纯问答）？            → 不组团队，单 agent + tools
+
+# ══════════════════════════════════════════════════════════════════════════
+# 第二部分 通信模式（communication）
+# ══════════════════════════════════════════════════════════════════════════
+# openjiuwen 两种（orchestrator 转交 A2A / 频道-订阅）保留，不加新范式；
+# 缺的不是范式，是【信封契约】与【频道 ACL】——没有它们，信任区形同虚设。
+
+channels:
+
+  routed_a2a:                        # 有中心的点对点（scheduler/interface-gateway 转交）
+    topology: hub-and-spoke
+    allowed_for: 卡分派/结果回流/escalation 移交
+    envelope: &envelope              # 一切 A2A 消息的强制信封（schema 强制）
+      trace_id: {required: true}     # 贯穿 intent→卡→run→判决→事件（对账键）
+      card_id: {required: false}     # 在途工作必带（无卡不开工的通信面表达）
+      in_reply_to: {required: false} # 会话线程锚
+      provenance: {required: true}   # 消息内容来源（self|artifact:<ref>|external_web）
+      source_class: {required: when provenance != self}   # 跨信任区必须标注
+      trust_boundary_crossed: {required: true}            # untrusted→trusted 必须显式
+
+  pub_sub:                           # 频道-订阅（团队广播/事件通知）
+    topology: bus
+    allowed_for: 状态广播/异常告警/审计通知——只通知不指挥
+    acl:                             # 【新增】频道按信任区与角色收口
+      cards.*:        {read: [team_members, scheduler], write: [scheduler]}
+      findings.*:     {read: [owner, curator, adversary], write: [adversary]}      # 红队产出隔离
+      decisions.*:    {read: [team_members, judge, owner], write: [judge, owner]}
+      events.*:       {read: [metrics-aggregator, owner], write: [platform]}       # 平台带外（event_integrity）
+      incidents.*:    {read: [responder, deployer, owner], write: [responder, deployer, owner]}
+    rules:
+      - 频道不是指令通道：pub_sub 只广播事实，指挥必走 routed_a2a（可追溯）
+      - 跨信任区内容进频道前必须已过界封装（schema+provenance+source_class）
+
+# ══════════════════════════════════════════════════════════════════════════
+# 第三部分 团队原型与组装规则（team archetypes & composition）
+# ══════════════════════════════════════════════════════════════════════════
+
+team_archetypes:
+
+  delivery_squad:                    # 交付小队（ephemeral，按波次组建）
+    mission: 单产品线的一个波次：意图（已批）→实现→判决→合并
+    members_shape:                   # 形状约束（实例化为 registry/teams/*.yaml）
+      planner: 1                     # 产卡（不随队常驻：卡批后退场，改卡再进场——handoff）
+      builder: 1..N                  # N 并发（subordinate fan_out）
+      test_author: 1                 # 与 builder 异族（validate 强制）
+      researcher: 0..2               # as_tool 挂靠（builder/planner 引用）
+    mechanisms: [scheduler, verifier, integrator, evidence-pack]   # 不占成员位
+    shared_services:                 # 跨队共享，不重复实例化
+      judge: 受理升级（escalation 入口；管辖域=团队声明的域枚举，owner-only 可改）
+    verification: {test_authors: [队内], verdict_by: mechanism:verifier, external_audit: governance-core}
+    lifecycle:
+      type: ephemeral
+      trigger: 波次计划获批（intent.ratified_by=owner）
+      archive_to: governance-core    # handoff: artifacts-pr/memory-distill/adr-write/trace-archive/retrospective
+      destroy: after-handoff（validate 强制）
+    budget: per_card {tokens, wall_clock, retries<=1, usd}（gateway 虚拟 key 熔断）
+
+  governance_core:                   # 治理核心（persistent，常设）
+    mission: 归档审核/漂移响应/知识沉淀（curator）+ 控制测试/premortem（adversary）
+    members_shape:
+      curator: 1
+      adversary: 1                   # 与 curator 互不领导（peer——adversary 独立性即价值）
+    mechanisms_dependent: [drift-check, metrics-aggregator, control-test-scheduler]
+    external_audit: "null:owner"     # 无人可审审计者 → 由制度审（owner 周审三件套）
+    lifecycle: {type: persistent, destroy: manual}
+
+  incident_cell:                     # 事故单元（adhoc，信号触发，短命）
+    mission: 生产事故响应：恢复→通知→retro
+    members_shape:
+      responder: 1                   # 预授权恢复（先做后报）
+      deployer: 0..1                 # 仅当需要前进修复（逐动作人签）
+      owner: 人工参与位              # 不是 agent——通知与批准通道
+    mechanisms_dependent: [evidence-pack（事故取证）, metrics-aggregator（MTTR）]
+    trigger: 告警/deployer 移交/owner 呼叫
+    lifecycle: {type: ephemeral, ttl: 72h, archive_to: governance-core, handoff: [retrospective, adr-write]}
+
+  # 预留（暂不实例化，团队需求出现时按 add-team 流程增补）：
+  #   knowledge_guild（persistent）: researcher 池+curator——跨队检索服务与知识库运营
+
+composition_rules:                   # 装配硬规则（validate/装配器强制）
+  mutex:
+    - {rule: planner↔builder 不得同声明, scope: 全组织}
+    - {rule: builder↔test_author 不得同声明, scope: 全组织}
+    - {rule: 同一 agent 不得同时在 ephemeral 团队与 persistent 团队担任成员, scope: 全组织, reason: 职责漂移}
+  independence:                      # 族级（v3 已强制，此处为装配面引用）
+    - test_author 族 ≠ 队内任一 builder
+    - judge 族 ≠ 争议双方（builder/test_author）
+  jurisdiction:                      # 管辖域法定
+    - judge 管辖域枚举落团队声明；仅 owner 可改（CT-JDG-003）
+    - 越域 escalation 必达 owner（judge 判"上升人类"是义务不是失败）
+  isolation:
+    - builder 工作区=team；test_author/judge/adversary=hermetic 或 private（不共享草稿记忆）
+    - 记忆不是规范来源：跨队可复用的是 artifact 与蒸馏后的 skill/ADR，不是记忆
+  workspace_memory_acl:              # 隐蔽信道封堵（v3 讨论：共享记忆=影子指令通道）
+    - 记忆命名空间按 agent 隔离；团队共享只允许经 artifacts/ 目录（版本化）
+    - 记忆条目带 provenance+TTL+confidence；builder 不可写任何 test_author/judge 可读命名空间
+  budget:
+    - 无预算不开队：ephemeral 组建必带 budget 声明（gateway 熔断依赖它）
+
+lifecycle_commons:                   # 一切 ephemeral 团队的生灭纪律
+  assemble: 声明（registry/teams/*.yaml PR）→ validate（形状/互斥/独立性/预算）→ owner 批 → 实例化
+  run: 事件流驱动；scheduler 状态机推进；一切过界内容带信封
+  handoff: 完成即归档（artifacts-pr/memory-distill/adr-write/trace-archive/retrospective）
+  destroy: after-handoff；销毁审计留痕（team_destroyed 事件）
+  sedimentation:                     # 资产沉淀去向（过程数据三分离的团队面）
+    声明与决策: git（registry/ADR）
+    事件: 数据层（append-only+哈希链）
+    原始轨迹: 对象存储（滚动 30 天）
+    知识: 蒸馏为 skill/policy/ADR 入库（curator 审核后才可复用）
+
+open_questions:                      # 待 owner/独立意见裁决的分歧点
+  - Q-A artifact_mediated 是否值得第一类范式（vs 视为 handoff 的变体）？
+      我的立场：值得——制品协作与消息协作的失败模式不同（冲突/陈读 vs 丢失/失真），
+      且它是我们体系的事实主流，不声明则装配器无从表达"走制品不走消息"。
+  - Q-B judge 是否应成为 delivery_squad 的机制依赖（每队一个）而非共享服务？
+      我的立场：共享——judge 常驻每队会被队内语境锚定（判例记忆污染），
+      共享+hermetic+证据只来自 evidence-pack 才能维持跨队中立；代价是调度延迟。
+  - Q-C incident_cell 的 owner 位是否需要 interface-gateway 机制接入（结构化事故面板）？
+      我的立场：暂不需要——owner 直接 IM/邮件进 incidents.* 频道即可，事故面板是过度工程。
+  - Q-D knowledge_guild（researcher 池常设化）现在建还是等检索缓存命中率数据出来再定？
+      我的立场：等数据——现在每队 0..2 个 as_tool 挂靠已够用，常设池有维护成本。
