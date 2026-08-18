@@ -12,6 +12,10 @@ model:
 capabilities:
   skills: [skill:code-review-fix]
   tools: [tool:read_file, tool:bash]
+  agent_tools: []                          # 独立验收者不调用任何 agent（防合谋，profile: checker）
+workflow:
+  mode: fixed
+  steps_ref: workflows/reviewer.steps.md
 permissions:
   inherit: org-default
   mode: strict                       # 治理审计角色用 strict：MEDIUM 即 ask
@@ -23,6 +27,9 @@ credential:
 memory:
   types: [semantic, episodic]
   retention: 90d
+io_contract:
+  input: {schema_ref: schemas/review-in.json}
+  output: {schema_ref: schemas/verdict.json}   # 判决：断言逐条 pass/fail+证据引用
 guardrails:
   output_schema_strict: true
   must_run: ["make check"]

@@ -12,6 +12,9 @@ model:
 capabilities:
   skills: []
   tools: [tool:read_file]     # 只读：看争议材料，不改任何东西
+  agent_tools: []             # 判决不借助任何 agent 输入，只读原始材料（profile: judge 全禁）
+workflow:
+  mode: fixed                 # 受理→管辖核对→主张摘录→依据检索→判决（见 identity）
 permissions:
   inherit: org-default
   mode: strict

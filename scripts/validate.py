@@ -21,6 +21,16 @@ def alias_of(a: dict):
     return (a.get("model") or {}).get("alias")
 
 
+def dig(d, path: str):
+    """按点路径取值；任一层非 dict 即返回 None（ADR-0009 profile.requires 消费）"""
+    cur = d
+    for k in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
 def load_yaml(path: Path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -59,6 +69,9 @@ if GW_CFG.exists():
     if gw_aliases != model_aliases:
         fail(f"deploy/llm-gateway/config.yaml 的别名 {sorted(gw_aliases)} 与 models.yaml {sorted(model_aliases)} 不一致（ADR-0002 rev1）")
 
+# ---- archetype profiles（ADR-0009）：内部构成与职责保证的可执行标准 ----
+PROFILES = (load_yaml(ROOT / "standards" / "archetype-profiles.yaml") or {}).get("profiles", {})
+
 OK = {"approved", "deprecated"}  # deprecated 仍可被既有声明引用，但新引用报警
 ACTIVE = {"approved", "active"}
 
@@ -73,6 +86,30 @@ for aid, a in agents.items():
             fail(f"agent:{aid} 是 checker 但 workspace.scope != private（AR-8 利益分离）")
         if a.get("permissions", {}).get("mode") != "strict":
             fail(f"agent:{aid} 是 checker 但 permissions.mode != strict（AR-8）")
+    # ---- profile 机器强制（ADR-0009）----
+    prof = PROFILES.get(arch) or {}
+    if not prof:
+        fail(f"agent:{aid} 的 archetype '{arch}' 在 standards/archetype-profiles.yaml 中无 profile")
+    for path in prof.get("requires") or []:
+        if not dig(a, path):
+            fail(f"agent:{aid}({arch}) 缺少 profile 必备项: {path}（ADR-0009）")
+    pm = prof.get("permissions_mode")
+    if pm and a.get("permissions", {}).get("mode") != pm:
+        fail(f"agent:{aid}({arch}) permissions.mode 必须为 {pm}（ADR-0009）")
+    banned_fx = set(prof.get("forbidden_tool_effects") or [])
+    if banned_fx:
+        for ref in a.get("capabilities", {}).get("tools", []) or []:
+            t = tools.get(ref.removeprefix("tool:")) or {}
+            hit = set(t.get("side_effects") or []) & banned_fx
+            if hit:
+                fail(f"agent:{aid}({arch}) 禁用带副作用 {sorted(hit)} 的工具 {ref}（ADR-0009）")
+    banned_arch = set(prof.get("forbidden_agent_tool_archetypes") or [])
+    if banned_arch:
+        for ref in a.get("capabilities", {}).get("agent_tools", []) or []:
+            rid = ref.removeprefix("agent:").split("@")[0]
+            rarch = (agents.get(rid) or {}).get("archetype")
+            if rarch in banned_arch:
+                fail(f"agent:{aid}({arch}) 禁止 agent_tools 引用 {rarch} 原型（{ref}）（ADR-0009）")
     for ref in a.get("capabilities", {}).get("skills", []) or []:
         sid = ref.removeprefix("skill:")
         if sid not in skills:
@@ -88,6 +125,18 @@ for aid, a in agents.items():
     alias = alias_of(a)
     if alias and alias not in model_aliases:
         fail(f"agent:{aid} 引用未注册的模型 alias: {alias}")
+    for ref in a.get("capabilities", {}).get("agent_tools", []) or []:
+        rid = ref.removeprefix("agent:").split("@")[0]
+        if rid not in agents:
+            fail(f"agent:{aid} 引用不存在的 agent_tools:{rid}")
+        elif agents[rid].get("status") not in OK:
+            fail(f"agent:{aid} 引用未批准的 agent_tools:{rid} (status={agents[rid].get('status')})")
+    pr = (a.get("identity") or {}).get("prompt_ref")
+    if pr and not (REG / pr).exists():
+        fail(f"agent:{aid} prompt_ref 文件不存在: {pr}")
+    sr = (a.get("workflow") or {}).get("steps_ref")
+    if sr and not (REG / sr).exists():
+        fail(f"agent:{aid} steps_ref 文件不存在: {sr}")
 
 # ---- skill 校验 ----
 for sid, s in skills.items():

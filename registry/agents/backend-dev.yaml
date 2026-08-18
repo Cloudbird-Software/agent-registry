@@ -12,6 +12,10 @@ model:
 capabilities:
   skills: [skill:tdd-loop, skill:code-review-fix]
   tools: [tool:bash, tool:read_file, tool:write_file, tool:gitcode-pr]
+  agent_tools: [agent:researcher-code]     # 检索增强；profile 禁止引用 checker/judge（防自证/施压）
+workflow:
+  mode: autonomous
+  entry_skills: [skill:tdd-loop]           # 流程蓝本见 profiles.builder.internal_flow
 permissions:
   inherit: org-default
   mode: normal

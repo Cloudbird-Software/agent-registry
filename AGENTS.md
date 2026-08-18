@@ -13,6 +13,8 @@
 | 场景 | 读这个 |
 |---|---|
 | 声明一个 agent / skill / tool / team | 对应 schema：`.github/standards/agent/*.schema.yaml` |
+| 理解某原型的内部构成与职责保证 | [standards/archetype-profiles.yaml](standards/archetype-profiles.yaml) |
+| 写某个 agent 的提示词 | registry/identities/ 既有范本 |
 | 选模型 / 查配额档 | [registry/models.yaml](registry/models.yaml) |
 | 理解某条现状的为什么 | [decisions/](decisions/) 的 ADR |
 | 校验声明引用完整性 | `python3 scripts/validate.py` |
