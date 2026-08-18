@@ -11,6 +11,25 @@ classes:
     gate: [lint]
     review: none
     merge: integrator auto
+  trivial:                          # ADR-0013：fix 意图的载体类（自明验收）
+    scope: 单点修复/文案/小改——对错在意图中说清（"错在哪即对在哪"）
+    card: required（卡=意图原文+验收=意图原文；无波次排程，scheduler 直分单 builder）
+    acceptance: self_evident（intent-routing 三分法；不经 intent_ratification 示例批准）
+    gate: [lint, unit]
+    review: none（verifier 判卷不豁免——见 intent-routing fix.note：例外膨胀防线）
+    merge: integrator auto
+    promote_if:                    # 路径规则（机制判定，防"小修"定义膨胀）
+      - 触及 dep/schema 面 → 升 logic/dep/schema
+      - 触及 tests/acceptance/** → 升 logic（强制 test_author review）
+      - 跨模块（>1 模块目录）→ 升 logic
+      - 验收不可自明（需构造示例才能说清"对"）→ 升 deliver（new_ratable）
+  spike:                            # ADR-0013：investigate 意图的载体类（无合并面）
+    scope: 调研/评估/选型——产认知不产代码（无合并面）
+    card: required（卡=问题清单；验收=问题被证据回答）
+    acceptance: evidence_based（产出 ADR/finding，schema 校验即合格）
+    gate: [adr-schema]              # 产出物 schema 校验（findings.json/ADR 结构）
+    review: curator 入库审核（跨团队=可审；ADR 归 decisions/ 走 C1）
+    merge: n/a（无代码合并面；产出走 ADR/finding 入库 PR）
   logic:
     scope: 业务代码/测试
     card: required

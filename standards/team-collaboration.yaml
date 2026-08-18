@@ -328,6 +328,8 @@ interfaces:                          # 团队间接口（全部 artifact_mediate
   backlog:                           # 治理→交付的回路（唯一需求入口；读写权限见 channels.acl）
     flow: "proposals（多写者）→ curator 单写者归并排序 → merged；adversary 经 findings 由 curator 审核转化（不直写提案）"
     producer_gate: planner 组建波次必处置 top-k——每项 纳入/驳回+理由/延期+条件（条件须机器可判定）
+    maintenance_trigger: owner 无新意图时 curator 提请 maintenance wave（触发条件
+      机器可判定——flows.yaml#maintain_loop.maintenance_wave.trigger；backlog 即波次范围）
     consumer_gate: 卡的 knowledge_refs 处置（见 artifacts.card.knowledge_refs）
   case_law:                          # 判例库（版本化 artifact，非记忆——记忆是锚定载体且不可审）
     entry: "judge 判决经 curator 审核入库；normative: false（提升为 policy/ADR 前无规范力）"

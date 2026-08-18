@@ -488,6 +488,35 @@ for _num, _files in _adr_files.items():
             fail(f"编号 {_num} 的多文件集合与豁免历史双档不符: {sorted(_files)}"
                  f"（豁免仅覆盖 {sorted(_exempt)}——改名/增删/新增同号文件均不允许）")
 
+# ---- intent-routing 路由表校验（ADR-0014：路由引用 fail-closed）----
+IR = load_yaml(ROOT / "standards" / "intent-routing.yaml") or {}
+INTENTS = IR.get("intents") or {}
+CHANGE_CLASSES = (load_yaml(ROOT / "standards" / "change-classes.yaml") or {}).get("classes") or {}
+TC_TEAMS = (_TC.get("teams") or {})
+_valid_sources = set(IR.get("acceptance_sources") or [])
+if not INTENTS:
+    fail("standards/intent-routing.yaml 路由表缺失或为空（ADR-0014）")
+for iid, spec in INTENTS.items():
+    if not isinstance(spec, dict):
+        continue
+    src = spec.get("acceptance_source")
+    if src not in _valid_sources:
+        fail(f"intent:{iid} acceptance_source '{src}' 不在三分法枚举 {sorted(_valid_sources)}")
+    cc = spec.get("change_class")
+    if cc and cc not in CHANGE_CLASSES:
+        fail(f"intent:{iid} change_class '{cc}' 不在 change-classes.yaml classes（机器不可判定）")
+    # carrier 引用的团队原型必须存在于 team-collaboration teams 声明
+    carrier = str(spec.get("carrier", ""))
+    for proto in ("delivery_squad", "stewardship", "incident_cell"):
+        if proto in carrier and proto not in TC_TEAMS:
+            fail(f"intent:{iid} carrier 引用不存在的团队原型 {proto}")
+# 反向：change-classes 每个新增意图载体类（trivial/spike）必须有意图路由到它
+_intent_classes = {spec.get("change_class") for spec in INTENTS.values()
+                   if isinstance(spec, dict) and spec.get("change_class")}
+for cc in ("trivial", "spike"):
+    if cc in CHANGE_CLASSES and cc not in _intent_classes:
+        fail(f"change-class '{cc}' 已定义但无 intent 路由到它（孤类——路由表不完整）")
+
 if errors:
     print(f"FAIL ({len(errors)}):")
     for e in errors:
