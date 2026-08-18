@@ -39,6 +39,13 @@ router_settings:
   allowed_fails: 3                           # 连续失败 3 次拉黑该节点
   cooldown_time: 60                          # 拉黑 60s
 
+# ── 预算熔断（ADR-0010 flows.yaml budget 的执行点）─────────────────
+# 【design-only，非 LiteLLM 原生配置——CodeRabbit #5】
+# 实现为 scheduler 的运行时行为：开卡时调 LiteTTM /key/generate 派生 per-card 虚拟 key
+# （max_budget/max_tokens 元数据，需启用 LiteLLM config DB），超限网关 429 fail-closed；
+# scheduler 收 circuit_broken 事件 → 回 planner 重规划。落地步骤见 README「预算熔断」节。
+# 同参重试 ≤1 次为 scheduler 侧限制，非网关职责。
+
 litellm_settings:
   drop_params: true
   request_timeout: 600

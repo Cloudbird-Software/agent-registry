@@ -1,0 +1,55 @@
+version: 1
+# ============================================================================
+# Flows —— 闭环两端 + 事件完整性 + 预算（ADR-0010 第三节/四节采纳）
+# 这是声明性标准：具体执行体（scheduler/gateway/CI check）引用此处的规则 id。
+# ============================================================================
+
+# ---- A. 意图保真：人审点前移到"验收示例批准"（比计划评审更高杠杆）----
+intent_ratification:
+  problem: 全链路验证"实现符合规格"，但规格是否符合意图此前无人验证——高效完美地造错东西
+  steps:
+    1: interface-gateway 结构化 intent（schema 校验后入数据层）
+    2: planner 产验收示例 5~15 条（具体输入→期望输出/可观察行为；owner 30 秒可读；不是实现描述）
+    3: owner 逐条批准/修改 → 签名+hash 落事件流（intent.ratified_by=owner）
+    4: 未批准的意图不得开卡（check:intent-ratified，scheduler 前置，CT-PLN-003）
+  acceptance_digest:
+    rule: "波次完成时产出一屏证据包（curl 记录/截图/golden diff/verdict 逐条对照已批示例）——不是只给 verdict:pass"
+    why: "owner 的注意力应花在『这是我想要的吗』，不是『测试绿了吗』"
+
+# ---- B. 现实反馈：escape 闭环（唯一能真实评价验证体系的指标）----
+escape_review:
+  trigger: owner 或生产发现了通过全部 gate 的缺陷（escaped defect）
+  steps:
+    1: 归因四选一——spec_gap（规格错/意图失真）| test_gap（测试没覆盖）| impl_gap（实现偏离）| env_gap（环境差异）
+    2: 必须产出回归测试进 tests/acceptance/**（由 test-author 经新卡）
+    3: 按归因更新：spec_gap→规格模板/policy；test_gap→测试指引/mutation 阈值；impl_gap→TDD 流程；env_gap→环境契约
+    4: 落 escape_found 事件（含归因+回溯链：缺陷→PR→卡→意图→验收示例）
+  metrics: escape_rate by change_class & by 归因（metrics-aggregator 周报）
+  note: escape_rate 比 mutation score 更贴近现实；它是 test-author/verifier 有效性的最终裁判
+
+# ---- C. 事件流完整性（所有 verified_by 的地基）----
+event_integrity:
+  emitted_by: {field: required, values: [platform, agent]}   # 强制字段
+  rules:
+    - tool_called 类事件只能 emitted_by=platform（工具调用网关带外发出；agent 无事件写凭据）
+    - agent 只可发自述类事件（decision_made/claim），且必须带 trace_id
+    - 存储 append-only（对象锁）+ 哈希链（prev_hash），写凭据与所有 agent 隔离
+  rationale: 若事件由 agent 自行上报，"不报即隐身"，全部审计断言失效（CT-EVT-001 守护）
+
+# ---- D. 预算与熔断（成本跑飞防线；机制而非裁量）----
+budget:
+  per_card: {tokens: required, wall_clock: required, retries_max: 1, usd: required}
+  enforcement:
+    - LLM Gateway per-run 虚拟 key 限额（tokens/usd 硬顶，超限 fail-closed）
+    - scheduler 状态机管 wall_clock/retries：同参重试 ≤1，再失败必须回 planner 重新规划（禁止对 builder 反复轰炸）
+    - 并发上限按团队声明；熔断触发落 circuit_broken 事件
+  on_exceed: fail-closed（宁可停，不可烧）
+
+# ---- E. 事故流（responder 预授权的法律逻辑）----
+incident:
+  phases: [detect, respond(pre-authorized), notify, retro_24h]
+  pre_authorized_actions: [deploy_reverse, feature_flag_off, scale_out]
+  rules:
+    - 恢复类动作先做后报（async_notify），全留痕
+    - 白名单外动作只能上报 owner
+    - 24h 内补事件详情与 retro；curator 追踪逾期债（CT-RSP-002）

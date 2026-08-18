@@ -1,43 +1,50 @@
 id: reviewer
-version: 1.1.0
+version: 2.0.0
 status: approved
-archetype: checker
-role: "代码评审与治理审计：PR 审查、政策符合性检查；输出=判决+理由，不产实现"
+archetype: test-author                   # v2：v1 checker 拆分——本实例只出题不判卷（判卷=verifier 机制）
+trust_zone: trusted_control
+role: "acceptance 测试作者：把 owner 已批规格转译为 tests/acceptance/**；实现开始前冻结测试树；不产 verdict"
 identity:
   prompt_ref: identities/reviewer.md
 model:
-  alias: reviewer
+  alias: reviewer                        # family=flagship ≠ builder 的 flash（CT-TA-002）
   temperature: 0.1
   reasoning_level: medium
 capabilities:
   skills: [skill:code-review-fix]
-  tools: [tool:read_file, tool:bash]
-  agent_tools: []                          # 独立验收者不调用任何 agent（防合谋，profile: checker）
-workflow:
-  mode: fixed
-  steps_ref: workflows/reviewer.steps.md
+  tools: [tool:read_file, tool:write_file, tool:bash, tool:gitcode-pr]
+  allow: [fs_read, fs_write_sandbox, fs_write_repo, vcs_read, vcs_branch_push, vcs_pr_open, shell_sandbox, datastore_read]
+  agent_tools:
+    refs: []                             # profile: max=0（不接受任何 agent 喂结论）
+isolation: hermetic                      # 与 builder 物理隔离，不共享草稿记忆
+approval: auto
+independence:
+  distinct_model_family_from: [builder]  # 族级（validate 对照 models.yaml family）
 permissions:
   inherit: org-default
-  mode: strict                       # 治理审计角色用 strict：MEDIUM 即 ask
   overrides:
-    - {tools: [tool:bash], pattern: "re:.*(push|commit).*", action: deny}   # 评审者只读仓库
+    # 默认拒绝：只放行 tests/**（CT-TA-001 写路径限制——CodeRabbit #5 建议的 default-deny 形式）
+    - {tools: [tool:write_file], pattern: "re:^(?!tests/).*$", action: deny}
+    - {tools: [tool:write_file], pattern: "tests/unit/**", action: deny}   # unit 属 builder（设计工具）
+    - {tools: [tool:write_file], pattern: "tests/acceptance/**", action: allow}
 credential:
   github_app: cloudbird-agent
   secrets: []
 memory:
-  types: [semantic, episodic]
+  types: [semantic]
   retention: 90d
 io_contract:
   input: {schema_ref: schemas/review-in.json}
-  output: {schema_ref: schemas/verdict.json}   # 判决：断言逐条 pass/fail+证据引用
+  output: {schema_ref: schemas/test-suite-out.json}   # 输出=测试产物+说明；无 verdict 字段（CT-TA-004）
 guardrails:
   output_schema_strict: true
-  must_run: ["make check"]
+  must_run: ["make test-acceptance"]
   forbidden: [no-secret-output]
   post_conditions:
-    - "[llm] 每条意见附依据（代码行/政策条目/风险说明）"
+    - "[ci] 测试树 sha 回写卡"
+    - "[llm] 每条测试注明对应验收示例 id"
 expose:
-  as_tool: true
+  as_tool: true                          # leader/scheduler 可按需调用（产出测试，非判决）
   a2a_card: auto
 workspace:
   scope: private

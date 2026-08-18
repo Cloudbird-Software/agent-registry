@@ -1,0 +1,46 @@
+version: 2
+# ============================================================================
+# Side-Effect Vocabulary v2 —— 工具副作用与权限白名单的统一词表（ADR-0010）
+#
+# v1 只有 4~5 类（filesystem_write/vcs_write/shell_exec/network），过粗，导致
+# v1 profiles 至少 5 处自相矛盾（禁 vcs_write 却要提测试 PR 之类）。v2 按语义
+# 分六组；capabilities.allow 白名单与本词表同域（未列出即禁止，fail-closed）。
+#
+# 消费方（validate.py 强制）：
+#   tool.side_effects   ⊆ 本词表
+#   agent.capabilities.allow ⊩ ⊆ 本词表
+#   agent 持有的每个 tool：tool.side_effects ⊆ agent.capabilities.allow
+# ============================================================================
+groups:
+  read:                        # 只读——不改变任何系统状态
+    fs_read:          读本地/工作区文件
+    vcs_read:         读仓库（clone/fetch/读 PR diff）
+    net_read:         读外部网络（web 检索/拉取外部文档）——不可信输入通道（trust zone 管控）
+    datastore_read:   读数据层（事件流/指标/判例）
+    memory_read:      读自身或授权记忆
+  write:                       # 写——但不触碰 git 历史与生产
+    fs_write_sandbox: 写自身沙箱/临时区（运行产物，随任务销毁）
+    fs_write_repo:    写仓库工作区文件（含提 PR 的内容路径；路径范围另由 permissions.overrides / token scope 收窄）
+    memory_write:     写自身记忆（经敏感过滤；记忆不是规范来源）
+    datastore_write:  写数据层（findings/事件回填/指标；集合范围另收窄）
+  vcs:                         # git 协作动作——写历史/评审流
+    vcs_branch_push:  推送自己的分支（不改 main）
+    vcs_pr_open:      开 PR / 评论 / 请求评审
+    vcs_merge:        合并到保护分支——只属于 integrator 机制（P0-6：合并=状态函数，不授予任何 agent）
+    vcs_admin:        改仓库设置/ruleset/secret/CODEOWNERS——全系统唯 owner 持有
+  exec:                        # 执行
+    shell_sandbox:    隔离环境内 shell（测试/构建/静态分析；无生产凭据）
+    shell_host:       宿主 shell（特权；仅 deployer 类且逐动作人签）
+    ci_trigger:       触发 CI/工作流（含自定 run 的输入）
+  supply:                      # 供应链（一人公司高频风险：幻觉依赖/抢注）
+    dependency_add:   新增/升级依赖（manifest 锁定物变更）
+    package_publish:  发布包/镜像
+  infra:                       # 生产
+    deploy_forward:   前进变更（部署/扩容/迁移开关）
+    deploy_reverse:   回滚/降级/回退迁移——responder 的预授权恢复动作
+    feature_flag:     翻特性开关（含 kill switch）
+    schema_migrate:   数据库 schema 变更
+    data_delete:      删数据（不可逆；最高审）
+    secret_read:      读生产密钥（environment 门禁 + RL-1）
+# 特殊值：none —— 纯函数工具（如 read_file）无副作用
+none_value: none

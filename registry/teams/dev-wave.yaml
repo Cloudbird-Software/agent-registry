@@ -1,34 +1,58 @@
 id: dev-wave
-version: 1.0.0
+version: 2.0.0
 status: approved
-goal: "按波次交付服务模块：实现+测试+PR，单波单仓"
+goal: 按波次交付服务模块：owner 批验收示例→test-author 出题冻结→builder 实现→verifier 机制判卷→integrator 合并，单波单仓
 members:
-  - {agent: agent:backend-dev, count: 2, as_tool: false}
-  - {agent: agent:reviewer, count: 1, as_tool: true}     # 评审者作为工具被 leader 调用
-topology: leader-teammate
+- agent: agent:backend-dev
+  count: 2
+  as_tool: false
+- agent: agent:reviewer
+  count: 1
+  as_tool: true
+topology: leader-teammate（leader=scheduler 机制，非 LLM 原型）
 orchestration:
-  assign: leader-dispatch
-  merge: leader-aggregate
+  assign: scheduler 状态机（按卡分派，预算熔断：重试≤1 同参，超限回 planner）
+  merge: integrator 机制（状态函数：checks 全绿+verifier verdict+卡号 metadata）——无 agent 持有合并权
   workflow_ref: workflows/dev-wave.flow.yaml
 verification:
-  in_team_check:
-    checkers: [agent:reviewer]          # 与 builder 不同声明；模型别名亦不同（coder-fast vs reviewer）
-    coverage: all-outputs
+  test_authors:
+  - agent:reviewer
+  verdict_by: mechanism:verifier（跑 test_tree_sha 冻结树，required status check）
+  coverage: all-outputs
   external_audit:
     team: team:governance-core
     frequency: weekly
-    method: [metrics-anomaly, re-check-sample, retrospective-review]
+    method:
+    - metrics-anomaly
+    - escape-review
+    - re-check-sample
+    - retrospective-review
 workspace:
   shared:
-    root: env:TEAM_WORKSPACE_ROOT         # 分布式部署 = 各节点同一 NFS 路径
+    root: env:TEAM_WORKSPACE_ROOT
     version_control: true
-  layout: {inbox: inbox/, artifacts: artifacts/, decisions: decisions/}
+  layout:
+    inbox: inbox/
+    artifacts: artifacts/
+    decisions: decisions/
 storage:
   type: postgresql
   ref: env:TEAM_DB_DSN
 lifecycle:
-  type: ephemeral                        # 任务制：波次完成即归档
-  archive_to: team:governance-core       # 资产沉淀目标（持久团队）
-  handoff: [artifacts-pr, memory-distill, adr-write, trace-archive, retrospective]
-  destroy_policy: after-handoff          # handoff 全部完成才允许销毁（AR-6）
-channels: [web]
+  type: ephemeral
+  archive_to: team:governance-core
+  handoff:
+  - artifacts-pr
+  - memory-distill
+  - adr-write
+  - trace-archive
+  - retrospective
+  destroy_policy: after-handoff
+budget:
+  per_card:
+    tokens: required
+    wall_clock: required
+    retries_max: 1
+    usd: required
+channels:
+- web

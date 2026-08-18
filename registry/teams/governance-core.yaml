@@ -1,28 +1,48 @@
 id: governance-core
-version: 1.0.0
+version: 2.0.0
 status: active
-goal: "常设治理团队：持有 .github 治理仓与 agent-registry 的审批权；接收并审核 ephemeral 团队的归档资产；运行漂移检测与周报"
+goal: 常设治理团队：归档审核+漂移响应+知识沉淀（curator）；控制测试与 premortem（adversary）；对治理资产持续负责
 members:
-  - {agent: agent:reviewer, count: 1, as_tool: false}
-topology: leader-teammate
+- agent: agent:curator-main
+  count: 1
+  as_tool: false
+- agent: agent:red-adversary
+  count: 1
+  as_tool: false
+topology: peer（curator 与 adversary 互不领导——adversary 独立性即价值）
 orchestration:
-  assign: leader-dispatch
-  merge: leader-aggregate
+  assign: cron 触发（周审/控制测试周期）+ 事件触发（handoff 到达/drift 报告）
+  merge: owner 手合（治理仓 C1/C2 永不 auto-merge）
   workflow_ref: workflows/governance-core.flow.yaml
 verification:
-  # 审计者自身不由被审计方检查（无人可审审计者）→ 由平台防线兜底：
-  # main-protection + gate + drift-check §8 + owner 破玻璃回填制
-  in_team_check: {checkers: [], coverage: all-outputs, note: "curator 团队产出走平台防线（PR+gate），无内部 builder/checker 分离需求"}
-  external_audit: {team: "null:owner", frequency: weekly, method: [drift-review], note: "owner 周会审阅 drift 报告"}
+  in_team_check:
+    checkers: []
+    coverage: all-outputs
+    note: curator 产出走平台防线（owner-only CODEOWNERS+gate+drift-check §8）；adversary findings
+      只进数据层——审计者不由被审计方检查，由制度审
+  external_audit:
+    team: null:owner
+    frequency: weekly
+    method:
+    - drift-review
+    - control-test-report
+    - escape-review
+    note: owner 周审：drift 报告 + adversary 控制测试报告 + escape_rate 周报
 workspace:
   shared:
     root: env:GOVERNANCE_WORKSPACE_ROOT
     version_control: true
-  layout: {inbox: inbox/, artifacts: artifacts/, decisions: decisions/}
+  layout:
+    inbox: inbox/
+    artifacts: artifacts/
+    decisions: decisions/
+    findings: findings/
 storage:
   type: postgresql
   ref: env:TEAM_DB_DSN
 lifecycle:
-  type: persistent               # 持续存在；对治理资产持续负责（AR-6）
+  type: persistent
   destroy_policy: manual
-channels: [web, tui]
+channels:
+- web
+- tui
