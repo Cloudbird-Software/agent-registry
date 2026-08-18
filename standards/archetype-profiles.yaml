@@ -12,6 +12,7 @@ version: 2
 #
 # 读法（AI）:
 #   mission/internal_flow/typical  同 v1（流程骨架/典型构成——指导性）
+#   enforced_by 的 check:*  = 平台仓 CI required check id（CI-Workflows 实现；未实装的属二期，activation 见 team-collaboration PART 5）
 #   trust_zone      untrusted_ingest（可触外部文本）| trusted_control（不可）
 #   capabilities.allow   副作用白名单（side-effects.yaml v2 词表；未列出即禁止）
 #   capabilities.agent_tools {allow: 原型白名单, max: 数量上限}（白名单，v1 黑名单废弃）
@@ -94,7 +95,7 @@ profiles:
     approval: auto
     duty_assurance:
       structural:
-        - claim: "写路径限 plans/|cards/|specs/ 顶层（无实现路径）"
+        - claim: "写路径限 plans/|cards/|specs/|contracts/ 顶层（无实现路径；contracts/=波次跨卡契约，planner 为 single_writer）"
           enforced_by: [token-path-scope, "check:pr-identity-path-matrix"]
           control_test: CT-PLN-001
         - claim: "无 git 提交权（vcs_* 写项不在 allow；计划经数据层+归档流转）"
@@ -153,7 +154,10 @@ profiles:
       3. 摘录双方主张（结构化）；依据检索只读仓内固定 ref 材料 + evidence-pack artifact
       4. 判决：decision+rationale+jurisdiction_basis+reversible_by=owner，落 decision_made 事件
       5. 判例仅检索辅助；同类争议 ≥3 次 → 产 policy_gap findings 交 planner 开卡（判例不得事实立法）
-    typical: {model_tier: 与争议双方异族, memory: [semantic 判例索引(非规范)], workspace: private}
+    typical:
+      model_tier: 与争议双方异族
+      memory: []                    # 判例唯一入口=case_law/ artifact 只读——per_dispute 判后销毁，无跨实例私有判例记忆
+      workspace: private
     capabilities:
       allow: [fs_read, vcs_read, datastore_read]
       agent_tools: {allow: [], max: 0}
@@ -162,7 +166,7 @@ profiles:
     independence: {distinct_model_family_from: [builder, test-author]}
     duty_assurance:
       structural:
-        - claim: "无任何写路径与网络（判决不可能污染被评对象，也不可能被外部输入实时污染）"
+        - claim: "无任何 datastore/fs 写路径与网络（判决以 decision_made 自述事件经平台通道产出——无写凭据；case_law 入库执行者=curator）"
           enforced_by: [capability-whitelist(validate), tool-surface]
           control_test: CT-JDG-001
         - claim: "不接受任何 agent 转述/喂结论（agent_tools=0）"
@@ -309,15 +313,16 @@ profiles:
   responder:                        # v1 operator 拆分：恢复动作
     kind: llm
     trust_zone: trusted_control
-    mission: 预授权恢复——回滚/降级/关开关；先做后报（async_notify），全留痕，24h 补 retro
+    mission: 预授权恢复——回滚/降级/关开关/冻结写入；先做后报（async_notify），全留痕，24h 补 retro
     internal_flow:
-      1. 接 incident 信号（告警/deployer 移交/owner 呼叫）
+      1. 接 incident 信号（告警/deployer 移交/owner 呼叫）——severity 分类由机制完成（incident_cell.severity_classified_by），responder 只按授权集执行
       2. 从预授权动作集内选择最小恢复动作执行（白名单外 → 只能上报，不得自扩）
       3. 即时通知 owner + 事件全留痕（先做后报的法律逻辑：恢复类动作延迟成本 > 误恢复成本）
       4. 24h 内补事件详情与 retro（curator 追踪为带期限的债）
     typical: {model_tier: fast, memory: [episodic 事故史], workspace: private}
     capabilities:
-      allow: [fs_read, vcs_read, deploy_reverse, feature_flag, ci_trigger, datastore_read, datastore_write]
+      allow: [fs_read, vcs_read, deploy_reverse, feature_flag, failover, scale, data_freeze, ci_trigger, datastore_read]
+                                     # 无 datastore_write：全部产出（事件/报告/retro）经平台通道落流（event_integrity）——无消费者授权不发
       agent_tools: {allow: [], max: 0}
     isolation: private
     approval: async_notify
@@ -354,7 +359,7 @@ profiles:
     mission: 合并——required checks 全绿 + verifier verdict 通过 + 卡号 metadata 规则满足 → 机械触发；无任何 agent 持有 vcs_merge
     llm_assist: none
     capabilities: {allow: [vcs_merge], agent_tools: {allow: [], max: 0}}
-    scope: 产品仓 logic 类变更；治理仓（C1/C2）永远 owner 手合
+    scope: 产品仓 logic/dep/schema 类变更（dep/schema 须 owner 批后方可自动合并）；治理仓（C1/C2）永远 owner 手合
 
   evidence-pack:                    # P0-7：中立证据机器
     kind: mechanism
@@ -367,10 +372,10 @@ profiles:
   scheduler:                        # v1 orchestrator 的确定性半边 → 机制
     kind: mechanism
     implementation: 状态机（openjiuwen 编排层，声明式配置）
-    mission: 调度——载入已批计划、按卡分派、超时/预算熔断（重试≤1 同参，再失败回 planner 重规划；无 LLM 裁量）
+    mission: 调度——载入已批计划、按卡分派、超时/预算熔断（同参重试按卡 risk_class 上限，再失败回 planner 重规划；无 LLM 裁量）
     llm_assist: {stage: failure-triage, alias: coder-fast, note: "仅失败归类与摘要，无重试/升级裁量"}
     capabilities: {allow: [fs_read, vcs_read, datastore_read, datastore_write, ci_trigger], agent_tools: {allow: [], max: 0}}
-    budget_enforcement: {per_card: {tokens, wall_clock, retries_max: 1, usd}, enforced_by: gateway-virtual-key + scheduler, on_exceed: fail-closed 回 planner}
+    budget_enforcement: {per_card: {tokens, wall_clock, "retries: 按 card.risk_class（默认 1；high ≤2）", usd}, enforced_by: gateway-virtual-key + scheduler, on_exceed: fail-closed 回 planner}
 
   interface-gateway:                # v1 interface 的管道半边 → 机制
     kind: mechanism
@@ -385,6 +390,46 @@ profiles:
     mission: 指标聚合与异常检测——run/token/失败率/拦截率/escape_rate/MTTR；结论只进数据层
     llm_assist: {stage: anomaly-narrative, alias: coder-fast, note: "仅异常叙述（数字算出来，人话写出来）；聚合本身无 LLM，保证可复算"}
     capabilities: {allow: [datastore_read, datastore_write, fs_read], agent_tools: {allow: [], max: 0}}
+
+  # ── 以下四个机制原型由 team-collaboration services 声明为服务，在此补齐信任声明 ──
+
+  card-gate:                        # 卡批准闸（services.card_gate 的原型）
+    kind: mechanism
+    implementation: 声明校验器（requires 七项全绿才输出 cards.ratified；纯代码）
+    mission: 卡批准——schema/capability_tags/DAG/testability_signoff/knowledge 处置/contracts/test_tree_sha 逐项机械检查
+    llm_assist: none
+    capabilities: {allow: [datastore_read, datastore_write], agent_tools: {allow: [], max: 0}}
+    structural_notes: 唯一输出事件=cards.ratified；无任何 LLM 裁量（批准不是判断是合规检查）
+
+  release-bot:                      # 发布执行者（services.release_bot 的原型）——全系统唯一持部署权的机制
+    kind: mechanism
+    implementation: ci-pipeline（PR merged 触发：部署 behind flag → 写 release_record）
+    mission: 发布——合并后自动部署 behind flag 并写 release_record（rollback_safe/rollback_window/flag_ids）
+    llm_assist: none
+    capabilities: {allow: [deploy_forward, feature_flag, ci_trigger, datastore_read, datastore_write, vcs_read], agent_tools: {allow: [], max: 0}}
+    stall_escalation: 流水线停滞超时 → escalation（队内无人能做发布，不能等死）
+    duty_assurance:
+      structural:
+        - claim: "只部署 behind flag，永不开启 flag（开启=owner 不可委派动作）"
+          enforced_by: [pipeline-acl, "check:flag-enable-owner-only"]
+          control_test: CT-RLB-001
+    structural_notes: 部署必写 release_record（rollback_safe 由部署内容机械判定）
+
+  knowledge-retrieval:              # 知识检索（services.knowledge_retrieval 的原型）
+    kind: mechanism
+    implementation: 确定性检索（按 capability_tags/争议关键字查 ADR/skill/case_law 索引，top-5 候选）
+    mission: 候选供给——防 planner/judge 自证"无相关知识"（候选由机制出，处置由人/agent 出）
+    llm_assist: none
+    capabilities: {allow: [fs_read, vcs_read, datastore_read, datastore_write, memory_read], agent_tools: {allow: [], max: 0}}
+    structural_notes: 只产候选列表不做判断；检索结果带 version_read（陈读不得作判决依据）
+
+  drift-check:                      # 治理漂移检测（services.drift_check 的原型）
+    kind: mechanism
+    implementation: ".github/governance/drift-check.sh（平台仓定时任务）"
+    mission: 漂移报告——§8 非 PR 直推检出、§9 admin 唯一性对账、治理资产与实际状态偏差
+    llm_assist: none
+    capabilities: {allow: [fs_read, vcs_read, datastore_read, datastore_write], agent_tools: {allow: [], max: 0}}
+    structural_notes: 报告只进数据层+owner 周审；stewardship 消费处置（curator 无权阻止其运行）
 
   # ════════════════════════ 伪原型（不实例化为 agent）════════════════════════
 

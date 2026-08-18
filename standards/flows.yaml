@@ -21,9 +21,10 @@ escape_review:
   trigger: owner 或生产发现了通过全部 gate 的缺陷（escaped defect）
   steps:
     1: 归因四选一——spec_gap（规格错/意图失真）| test_gap（测试没覆盖）| impl_gap（实现偏离）| env_gap（环境差异）
-    2: 必须产出回归测试进 tests/acceptance/**（由 test-author 经新卡）
+    2: 产 backlog 提案（含回归测试卡提案+归因）——原队常已销毁，回归测试由下一波次 test_author 经新卡落地
+       （下一波次 producer_gate 强制处置该提案：纳入即含回归测试验收）
     3: 按归因更新：spec_gap→规格模板/policy；test_gap→测试指引/mutation 阈值；impl_gap→TDD 流程；env_gap→环境契约
-    4: 落 escape_found 事件（含归因+回溯链：缺陷→PR→卡→意图→验收示例）
+    4: 落 escape_found 事件（生产者=owner 经 interface-gateway，平台落事件；含归因+回溯链：缺陷→PR→卡→意图→验收示例）
   metrics: escape_rate by change_class & by 归因（metrics-aggregator 周报）
   note: escape_rate 比 mutation score 更贴近现实；它是 test-author/verifier 有效性的最终裁判
 
@@ -38,17 +39,18 @@ event_integrity:
 
 # ---- D. 预算与熔断（成本跑飞防线；机制而非裁量）----
 budget:
-  per_card: {tokens: required, wall_clock: required, retries_max: 1, usd: required}
+  per_card: {tokens: required, wall_clock: required, retries: "按 card.risk_class（默认 1；risk_class=high 可声明至 2）", usd: required}
   enforcement:
     - LLM Gateway per-run 虚拟 key 限额（tokens/usd 硬顶，超限 fail-closed）
-    - scheduler 状态机管 wall_clock/retries：同参重试 ≤1，再失败必须回 planner 重新规划（禁止对 builder 反复轰炸）
+    - scheduler 状态机管 wall_clock/retries：按卡 retries 上限同参重试，再失败必须回 planner 重新规划（禁止对 builder 反复轰炸）
     - 并发上限按团队声明；熔断触发落 circuit_broken 事件
   on_exceed: fail-closed（宁可停，不可烧）
 
 # ---- E. 事故流（responder 预授权的法律逻辑）----
 incident:
   phases: [detect, respond(pre-authorized), notify, retro_24h]
-  pre_authorized_actions: [deploy_reverse, feature_flag_off, scale_out]
+  authorization_ref: standards/team-collaboration.yaml#teams.incident_cell.authorization
+    # v1.0 条件预授权（按 severity×release_record.rollback_safe 分档）——本节不复述，防双源漂移
   rules:
     - 恢复类动作先做后报（async_notify），全留痕
     - 白名单外动作只能上报 owner

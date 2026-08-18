@@ -1,443 +1,407 @@
-version: 0.2-draft          # 草案 v0.2：吸收专家二审意见（本轮反馈处置记录见文件末 disposition）
+version: 1.0
 # ============================================================================
-# Team Collaboration Standard v0.2 —— 协作范式 / 通信 / 团队原型 / 团队间接口
-#                                  / 注意力预算 / 运行补齐
+# Team Collaboration Standard —— 多 agent 团队与协作（v1.0）
 #
-# v0.1→v0.2 主线变化（专家二审结论：问题集中在时间维度与注意力经济）：
-#   1. 成员位加时间维度（phase/enter_on/exit_on/reentry）——静态形状→时序形状
-#   2. card_amendment 全流程——封 spec gaming 入口；预算时钟暂停（不惩罚提 amendments 的诚实方）
-#   3. test_strategy 分层（visible + holdout 独立仓）——holdout 从二期提前到一期
-#   4. governance_core 拆为 stewardship + red_cell（adversary 改 on-demand 共享服务）
-#   5. incident_cell：severity 授权分级、人位移出 members_shape、TTL 到期=升级绝不销毁
-#   6. boundary_axioms——封 incident_cell 这个 PR 治理旁路
-#   7. 团队间接口：backlog 双强制点、case_law artifact、merge→prod 方案 A
-#   8. principal_attention_budget——owner 注意力显式预算化（全系统唯一不可扩容资源）
-#   9. 运行补齐：instance_identity / degraded_mode / spike card / 依赖 DAG
+# 骨架对齐 openjiuwen（不改变框架原则，只做时序与权限的声明化扩展）：
+#   协作三范式（subordinate/agent_as_tool/handoff）保留原名原义，扩展第四范式
+#   通信两模式（orchestrator 转交 A2A / 频道订阅）保留，加强制信封
+#   Team 声明仍落 registry/teams/*.yaml（members[].agent + as_tool 形态延续）
+#
+# 本文件是可执行声明：scripts/simulate-wave.py 消费本文件的相位图/权限/预算
+# 做确定性流程模拟（别的 AI 复跑可复现）；validate.py 做结构校验。
+#
+# 组织（五部分，替代 v0.2 九部分——收敛重复，一张图一条线）：
+#   PART 1 协作：范式与通信——工作怎么在 agent 之间流动
+#   PART 2 团队：scopes（权限域）× seats（座位）× services（共享服务）× teams（原型）
+#   PART 3 流与制品：flow（相位状态机+判决）× artifacts（一切跨阶段载体）× interfaces（团队间接口）
+#   PART 4 约束：公理（边界+不可委派）、预算不变式、注意力账本（→ attention-ledger.yaml）、指标
+#   PART 5 生效：activation——什么现在开，什么等触发
 # ============================================================================
 
-# ══════════════════════════════════════════════════════════════════════════
-# 第一部分 协作范式（collaboration paradigms）
-# ══════════════════════════════════════════════════════════════════════════
-# 统一视角：一切协作范式本质是【上下文传递策略】（context economics）——
-#   谁保留任务全貌、谁只拿切片、结论以什么形态过界。
-
-paradigms:
-
-  subordinate:                       # openjiuwen: 主从（含 fan-out）
-    context_strategy: 切片（slice）  # 主保留全局，从只拿工作卡（含验收引用+预算+依赖声明）
-    who_leads: scheduler 机制（非 LLM，确定性分派 → 卡必须携带 capability_tags + depends_on）
-    fan_out: true                    # 同构从节点（builder 池）并发分派，结果聚合
-    use_when: 批量同构任务（多卡并行实现）；从节点无需全局视野
-    failure_mode: 每卡单独通过、合起来语义冲突（见 cross_card_consistency——fan-out 的真失败模式）
-    examples: [scheduler→builder 池按卡分派]
-
-  agent_as_tool:                     # openjiuwen: agent-as-tool
-    context_strategy: 压缩（compress）# 调用方保留任务上下文；被调方自消化全文，只回结论+引用
-    contract: io_contract 单次往返   # 输出封板不可二次加工（CT-RES-003）
-    use_when: 上下文经济（researcher）；把"判断"外包但决策权留在调用方
-    failure_mode: 往返膨胀/结论污染 → 体积受 io_contract 约束 + source_class 分级过界
-    examples: [builder/planner → researcher 检索]
-
-  handoff:                           # openjiuwen: handoff
-    context_strategy: 移交（hand-over）# 调用方放弃上下文，被调方全量接管；移交包=任务+最小充分上下文
-    use_when: 阶段切换（计划→执行）；执行权整体转移
-    rules:
-      - 移交包最小充分：只带卡+验收引用+决策摘要，不带草稿记忆（hermetic 方向）
-      - 移交后原方退出（不并行指挥——单一执行权）
-    subtypes:
-      escalation:                    # 语义子类型（非新范式）
-        semantics: 向上移交+不可拒绝 # "我们做不了决定，请上级裁"——区别于普通移交的"我不想做了"
-        to: [judge（域内）, owner（越域/管辖枚举外）]
-        carrier: evidence-pack artifact（证据不经争议方转述）
-        anti_pattern: escalation 携带己方倾向性摘要（=给仲裁者注入）→ judge 摘录双方主张自证据包
-        budget_note: escalation 不计入发起方的卡预算（overhead_pool 承担——不惩罚升级诚实方）
-
-  artifact_mediated:                 # 第四范式（openjiuwen 三范式皆消息中心）
-    context_strategy: 共享（share）  # 上下文不点对点传递，落共享制品；参与方异步读写同一物
-    medium: [git PR, 事件流, 数据层 findings/cards/backlog, 团队工作区, case_law, contracts]
-    # 为什么必须是第一类范式（强论证，不可归约为 handoff 变体）：
-    #   它是唯一支持【参与方不同时存在】的范式。subordinate/agent_as_tool/handoff
-    #   都要求双方在同一时间窗内活着；而本体系以 ephemeral 团队为主——
-    #   delivery_squad 销毁之后其产出仍要被 stewardship 消费，这跨越了生命周期边界。
-    #   消息范式在生命周期边界上直接失效（收件人已不存在），制品范式不失效。
-    use_when: 异步解耦、跨生命周期协作（交付链/审计/归档/判例积累）
-    examples:
-      - builder 提 PR ↔ verifier 判决 ↔ integrator 合并：三方零实时协调，全走 PR 状态机
-      - adversary 写 findings ↔ owner 周审：生产消费完全解耦
-      - 交付队销毁 → handoff 资产 → stewardship 归档：跨团队跨生命周期
-    concurrency:                     # 共享制品的并发纪律
-      default: optimistic_cas        # 读带 version，写时 CAS；冲突→重读（计入 retries 上限）
-      single_writer: [backlog, "contracts/*", adr_index, case_law/entries]   # 单写者制品免 CAS
-      conflict_escalation: 同一 artifact CAS 连续失败 2 次 → escalation（协作边界划错了的信号）
-      staleness: 读取必须记录 version_read；判决/合并时校验是否已陈旧（陈读不得作为依据）
-
-# 范式选择决策表（装配器路由）：
-#   需要判断但不要全局上下文？        → agent_as_tool（researcher）
-#   阶段责任整体切换？                → handoff（planner→builder）
-#   双方僵持需要第三方裁？            → handoff.escalation（judge/owner）
-#   批量同构并行？                    → subordinate + fan_out（+ cross_card contracts）
-#   参与方异步/跨生命周期/以物为界？  → artifact_mediated
-#   一切都不是（纯问答）？            → 不组团队，单 agent + tools
+# ── 六条组织原则（设计的公理层，冲突时以此裁决）──────────────────────────
+principles:
+  - 权限边界切团队，不按功能切（delivery/knowledge/adversarial/operational，非前端队/测试队）
+  - 能确定的用代码（LLM 只坐判断位；调度/判卷/合并/发布全是机制）
+  - 上下文经济学（一切协作=上下文传递策略：切片/压缩/移交/共享）
+  - 预算与考核不惩罚诚实（升级免费、歧义卡暂停时钟、amendment 不计失败率）
+  - 默认动作永远选"事后撤销代价更小"的一侧（推导见 PART 4 axioms.default_action）
+  - 注意力是唯一不可扩容资源（一切 owner 阻塞点入账本，新增必须移除一个）
 
 # ══════════════════════════════════════════════════════════════════════════
-# 第二部分 通信模式（communication）
+# PART 1 协作（collaboration）
 # ══════════════════════════════════════════════════════════════════════════
-# openjiuwen 两种保留；不加新范式，强制点是【信封契约】【频道 ACL】【通知模板+默认动作】。
 
-channels:
+paradigms:                           # 四范式；前三为 openjiuwen 预置
+  subordinate:                       # 主从（含 fan-out）
+    context_strategy: 切片           # 主保留全局；从只拿卡（验收引用+预算+依赖）
+    who_leads: mechanism:scheduler   # 确定性分派 → 卡必须带 capability_tags + depends_on
+    use_when: 批量同构并行（多卡到 builder 池）
+    failure_mode: 每卡都过、合起来冲突 → 跨卡一致性靠 contracts artifact（PART 2 delivery_squad.wave_consistency）
+  agent_as_tool:                     # agent 作为工具（openjiuwen members as_tool 形态）
+    context_strategy: 压缩           # 被调方自消化全文，只回结论+引用（researcher）
+    contract: io_contract 单次往返；输出封板不可二次加工
+    use_when: 把判断外包、决策权留在调用方
+  handoff:                           # 移交
+    context_strategy: 移交           # 调用方退出，被调方接管；移交包=卡+验收引用+决策摘要
+    use_when: 阶段切换（plan→build）；责任整体转移
+    subtype escalation:              # 向上移交+不可拒绝（"我们裁不了"≠"我不想干"）
+      to: [service:judge（域内，激活后）, owner（越域/judge 未激活）]
+      carrier: evidence-pack（证据不经争议方转述；禁携倾向性摘要）
+      budget: 计入发起方 overhead_pool（见 budget.invariants——升级通道永不冻结）
+  artifact_mediated:                 # 第四范式（扩展）：以制品为界，跨生命周期
+    context_strategy: 共享           # 参与方异步读写同一制品，可不同时存在
+    medium: [git PR, 事件流, 数据层（cards/findings/backlog/case_law）, contracts, 团队工作区]
+    why_first_class: 唯一支持参与方不同时存在的范式——ephemeral 队销毁后其产出仍被
+      stewardship 消费；消息范式在生命周期边界失效，制品范式不失效
+    concurrency: {default: optimistic_cas, single_writer: [backlog, contracts, adr_index, case_law],
+                  conflict_escalation: "CAS 连续失败 2 次 → escalation（协作边界划错）",
+                  staleness: 读必记 version_read；陈读不得作判决依据}
 
-  routed_a2a:                        # 有中心的点对点（scheduler/interface-gateway 转交）
-    topology: hub-and-spoke
-    allowed_for: 卡分派/结果回流/escalation 移交
-    envelope:                        # 一切 A2A 消息的强制信封（schema 强制）
-      trace_id: {required: true}     # 贯穿 intent→卡→run→判决→事件（对账键）
-      card_id: {required: false}     # 在途工作必带（无卡不开工的通信面表达）
-      in_reply_to: {required: false} # 会话线程锚
-      provenance: {required: true}   # 消息内容来源（self | artifact:<ref> | external_web）
+channels:                            # 通信两模式（openjiuwen）+ 人通知
+  semantics: "write=经平台通道发布（事件流/PR/频道 API），非 datastore 直写凭据——与 flows.yaml event_integrity 一致"
+  routed_a2a:                        # orchestrator/scheduler 转交的点对点
+    envelope:                        # 一切 A2A 消息强制信封（schema 校验）
+      trace_id: {required: true}     # 贯穿 intent→卡→run→判决→事件
+      card_id: {required: false}     # 在途工作必带
+      provenance: {required: true}   # self | artifact:<ref> | external_web
       source_class: {required_when: provenance != self}
-      trust_boundary_crossed: {required: true}   # untrusted→trusted 必须显式
-
-  pub_sub:                           # 频道-订阅（广播/事件通知）
-    topology: bus
-    allowed_for: 状态广播/异常告警/审计通知——只通知不指挥
-    acl:                             # 频道按信任区与角色收口
-      cards.*:        {read: [team_members, scheduler], write: [scheduler]}
-      findings.*:     {read: [owner, curator, adversary], write: [adversary]}      # 红队产出隔离
-      decisions.*:    {read: [team_members, judge, owner], write: [judge, owner]}
-      events.*:       {read: [metrics-aggregator, owner], write: [platform]}       # 平台带外
-      incidents.*:    {read: [responder, deployer, owner], write: [responder, deployer, owner]}
-      backlog.*:      {read: [planner, curator, owner], write: [curator]}          # 单写者锁
-    rules:
-      - 频道不是指令通道：pub_sub 只广播事实，指挥必走 routed_a2a（可追溯）
-      - 跨信任区内容进频道前必须已过界封装（schema+provenance+source_class）
-
-  human_notification:                # 指向 owner 的通知（incidents/审批请求/deferral 队列）
-    template:                        # 强制四行结构——自由文本不可行动
-      - "severity + 一句话影响面"
-      - "已自动执行: [...]"
-      - "需要你决定: <单一问题，选项枚举>"
-      - "默认动作: <X> 将在 <timeout> 后自动执行"
-    rules:
-      - 无默认动作的人在环点 = 系统在 owner 缺席时状态未定义 → 一律禁止
-      - 默认动作按动作类型分别写死（见 incident_cell.principals 与 attention_budget），不得临场判断
+      trust_boundary_crossed: {required: true}
+  pub_sub:                           # 频道-订阅
+    rule: 只广播事实不指挥（指挥必走 routed_a2a，可追溯）
+    acl:
+      cards.*:     {read: [team_members, scheduler], write: [scheduler]}
+      findings.*:  {read: [owner, curator, adversary], write: [adversary, mechanism:gate]}  # gaming 检测在 gate；builder 申诉经 evidence-pack 附副本（无直读权）
+      decisions.*: {read: [team_members, judge, owner], write: [judge, owner]}   # judge 写=decision_made 自述事件（平台通道）
+      review.*:    {read: [team_members, scheduler, owner], write: [test_author]}   # review 裁定= test_author decision 类自述事件（合并闸门钥匙之一）
+      events.*:    {read: [metrics-aggregator, owner], write: [platform]}   # 平台带外
+      incidents.*: {read: [responder, deployer, owner], write: [responder, deployer, owner]}
+      backlog.proposals.*: {read: [curator], write: [curator, responder, owner, planner]}   # 提案层（多写者；ACL 唯一真源）
+                                        # adversary 不直写提案——其 findings 经 curator 审核后由 curator 转化入库（跨团队=可审，CT-ADV-002 写域限 findings/**）
+      backlog.*:   {read: [planner, curator, owner], write: [curator]}      # 归并层（单写者）
+  human_notification:                # 指向 owner 的一切通知
+    template: [severity+影响面一句话, 已自动执行, 需你决定（单问题+选项枚举）, 默认动作+超时]
+    rule: 无默认动作的人在环点禁止存在（默认动作按 axioms.default_action 推导，不逐项拍）
 
 # ══════════════════════════════════════════════════════════════════════════
-# 第三部分 团队原型（team archetypes）
+# PART 2 团队（scopes × seats × services × teams）
 # ══════════════════════════════════════════════════════════════════════════
 
-team_archetypes:
+scopes:                              # 权限域：定义"能碰什么"（boundary axioms 的规范化）
+  delivery:    {may_touch: [code, PR, tests, contracts], may_not: [prod, policy]}
+  knowledge:   {may_touch: [backlog, ADR, skill, policy, case_law], may_not: [code]}
+  adversarial: {may_touch: [findings, control_tests], may_not: [code, policy]}
+  operational: {may_touch: [flags, config, rollback], may_not: [code]}     # 代码修复必经 delivery 卡
 
-  # ── 3.1 交付小队 ──────────────────────────────────────────────────────
-  delivery_squad:                    # ephemeral，按波次组建
-    mission: 单产品线一个波次：意图（已批）→实现→判决→合并→**released_behind_flag**（方案 A：合并即止延伸为"上线即止"）
-    members_shape:                   # 时序形状（v0.2：加 phase 维度）
-      planner:
-        count: 1
-        phase: plan
-        exit_on: cards.ratified      # 卡批准即退场（不再是常驻位——修复 v0.1 时序矛盾）
-        reentry: on_amendment_request   # normative amendment 必重入；non_normative 可重入
-      test_author:
-        count: 1
-        phase: [plan, build]         # v0.2 前移：卡定稿前审"验收可测吗"（卡质量主要来源的堵点）
-        enter_on: team_assemble
-      builder:
-        count: 1..N
-        phase: build
-        enter_on: cards.ratified
-      researcher:
-        count: 0..2
-        phase: any
-        binding: as_tool             # 挂靠引用，不占实体成员位
-    phase_order: [plan, build, verify, integrate]
-    time_invariants:                 # 时序互斥（替代并强化静态互斥）
-      - planner 与 builder 不得在同一 phase 在场（写权不重叠）
-      - builder↔test_author 仍全时互斥（不同声明——validate 强制）
-    mechanisms: [scheduler, verifier, integrator, evidence-pack]   # 不占成员位
-    shared_services: [judge, red_cell]   # 跨队共享（见 3.3/3.4）
-    verification:
-      test_authors: [队内]
-      verdict_by: mechanism:verifier
-      external_audit: stewardship（escape-review / 抽样复检）
-    verdict_layers:                  # 三层判决（v0.2 显式化）
-      gate:        {type: mechanism, deterministic: true, output: "pass/fail + evidence", covers: "CI/覆盖率/静态检查/契约符合"}
-      review:      {type: member, by: test_author, question: "实现是否满足卡意图（不只是过测试）",
-                    note: "意图符合性审查≠判卷（判卷=verifier 机制）；按 change-classes 绑定：doc 类免 review，logic 类必须"}
-      arbitration: {type: shared_service, by: judge, trigger: "builder↔test_author 主张僵持",
-                    routing: "'测试写错了'的主张先走 test-author 修复路径（新卡/amendment），僵持才进仲裁"}
-    merge_policy: "gate.pass AND review.approve → integrator 自动合并（无人工）"
+seats:                               # 座位：占实体成员位（= archetype 实例的运行位）
+  present_in_phases:                 # 相位在场表（相位图见 PART 3 flow.phases）
+    planner:     {phases: [plan], exit_on: cards.ratified, reentry: on_normative_amendment, state_on_reentry: active}
+                                       # exit_on 使 plan→build 边条件 planner.state==exited 可求值（无 exit_on=主流程死锁）
+    test_author: {phases: [plan, build, verify, handoff]}   # plan=可测性审查；verify=意图符合性 review；handoff=retrospective
+    builder:     {phases: [build, verify], exit_on: "pr.merged OR wave.frozen"}   # verify 在场=返工回路
+    researcher:  {phases: any, binding: as_tool}       # 不占实体位（openjiuwen as_tool）
+    curator:     {phases: [steady]}                    # stewardship 常驻
+    adversary:   {phases: [invoked]}                   # red_cell 按需（owner 调用/触发器）
+    responder:   {phases: [incident]}
+    deployer:    {phases: [incident]}                  # 仅事故前进修复；正常发布无此位
+  states: [absent, active, frozen, exited]
+  write_exclusion:                   # 写锁不变式（替代"同相在场"互斥——本质是 artifact 写权限）
+    rule: 任一时刻对同一 artifact 处于 active 态的座位数 <= 1
+    example: planner 重入（amendment）期间 builder 必须 frozen（card.lifecycle 已有 run:frozen，此处升为不变式）
+    enforced_by: runtime                             # assemble 时 validate 查不出运行时并发
 
-    card_amendment:                  # v0.2 新增：封 spec gaming 入口（改卡是最高频现实路径）
-      initiator: [builder, test_author]     # 只能提 amendment_request（artifact，不是消息）
-      forbidden: builder 直接写 card 任何字段
-      classify:
-        non_normative: {fields: [实现提示, 参考链接, 拆分粒度], approver: planner, default: auto_with_veto}
-        normative:     {fields: [acceptance_criteria, 验收引用, 契约], approver: owner}   # 改验收=改需求
-      during_amendment: {run: frozen, budget_clock: paused}    # 不暂停=用预算机制诱导掩盖问题
-      escalate_when: 同一 card 的 normative amendment 次数 >= 2   # 卡本身有问题，回炉
-      metrics: amendment_rate 按 planner 归因（产卡质量指标，不是 builder 的锅）
-      honesty_rule: amendment 请求不计入发起方失败率指标（同 overhead_pool 逻辑——预算与考核都不惩罚诚实）
+services:                            # 共享服务：跨队、按需实例化、不占团队成员位
+  interface_gateway:                 # 组织级意图入口（常驻——archetype-profiles 机制原型实例）
+    kind: mechanism
+    duty: 人类输入→脱敏→intent schema 校验→路由（新工作→planner；在途→scheduler）
+    owner_involvement: none（NL→intent 薄 LLM 层必须过 schema）
+    availability: organization-level（不属任何单队——一切意图经此入境）
+  card_gate:                         # 卡批准=机制输出（不是人的动作，不是 planner 自批）
+    kind: mechanism
+    output_event: cards.ratified
+    requires: [schema 合规, capability_tags 非空, depends_on 为 DAG, testability_signoff（test_author 逐卡）,
+               test_tree_sha 已回写卡（测试树冻结——无树不批卡）,
+               knowledge 处置完成（PART 3 artifacts.card.knowledge_refs）, contracts 存在（N>1 时）, risk_class 已标注]
+    owner_involvement: none          # owner 只批 intent 与 normative amendment
+  judge:                             # 仲裁（激活条件见 PART 5；未激活时 escalation 直达 owner）
+    kind: llm_service, per_dispute   # 一次仲裁一实例，判后销毁（防路径依赖）
+    members: [agent:arbiter]         # 服务型座位绑定（不入团队成员；激活时实例化）
+    invoked_by: [delivery 僵持, escalation]
+    activation_counter: metrics-aggregator 计数 verdict_stalemate 事件（scheduler 产）——
+                       "僵持累计 >= 2"由此可判定（无计数器=激活不可复算）
+    budget_from: 发起方 overhead_pool（升级通道不受预算约束——budget.invariants）
+    independence: 族 ≠ 争议双方；同一 dispute 不得复用上次实例
+    reads: [evidence-pack（schema 见 PART 3 artifacts）, case_law/, card]   # 固定包，禁读团队工作区/争议方原始对话
+    writes: []                        # 判决=decision_made 自述事件经平台通道（无写凭据，CT-JDG-001）；
+                                      # case_law 入库执行者=curator（经 curator 审核后由 curator 写入）
+  red_cell:                          # 红队（owner 直属，on-demand；独立于 stewardship）
+    kind: llm_service, owner_invoked
+    members: [agent:red-adversary]   # 服务型座位绑定（激活即用——不入团队成员）
+    invoke_on: [重大决策前 premortem, 控制测试排期, gaming 信号, owner 随机抽发]
+    quota: {findings_per_week: "<=3", forced_ranking_top: 5, archive: 全量归档可查（quota 限注意力不限记录）}
+    audit_of_auditor:                # 互为指标（绝对信号，非比率——见 PART 4 metrics）
+      pause_trigger: 连续 3 次调用零有效 findings → 暂停两周转纯 owner-invoked
+      immediate_trigger: 控制测试首次未命中 → 立即人工看（设施漂移最强单点信号）
+  release_bot:                       # 发布执行者（无 agent 持有此权——机制）
+    kind: mechanism
+    on: "PR merged（integrator）→ 部署 behind flag → 写 release_record"
+    stall_escalation: 流水线停滞超时 → escalation（队内无人能做发布，不能等死）
+  knowledge_retrieval:               # 知识检索（防自证不存在——候选由机制出，处置由人/agent 出）
+    kind: mechanism
+    consumers: [delivery_squad（卡侧）, stewardship（判例侧）]   # 跨队共享——服务即为此设计
+    on_card: 按 capability_tags 检索 ADR/skill 候选 top-5 → 卡必须逐项 applies/not_applicable(理由)
+    on_verdict: 检索候选判例 top-5 → judge 逐项 follow/distinguish
+  drift_check:                       # 治理漂移检测（平台仓实现——org 级常驻）
+    kind: mechanism
+    implementation: ".github/governance/drift-check.sh（平台仓；含 §9 vcs_admin 唯一性）"
+    output: drift 报告 → owner 周审（stewardship 消费）
 
-    test_strategy:                   # v0.2：holdout 提前到一期
-      visible_suite:
-        by: test_author
-        readable_by: [builder]       # 开发反馈用途
-      holdout_suite:
-        by: test_author
-        location: 独立私有仓（仅 CI/App 凭据可访问；同仓 clone 即全文可读——诚实落地，不做假隔离声明）
-        readable_by: [gate]          # builder 工作区不可见；失败只回报断言 id
-        ratio: ">= 30% of acceptance assertions"
-        regenerate_per_card: true
-      hard_rules:
-        - builder 的 PR 触及 tests/** → 自动 escalation 到 test_author，builder 不可自批
-        - holdout 失败但 visible 全绿 → 判定 gaming 嫌疑，进 findings（可统计行为信号，不只一次 fail）
-        - mutation check 作为机制门禁：测试被稀释即拦
-
-    cross_card_consistency:          # v0.2 新增：fan-out 的真失败模式=每卡都过、合起来冲突
-      artifact: "contracts/<wave_id>.yaml"   # planner 在 plan 阶段产出：卡间接口/共享类型/不变量
-      writer: planner (single_writer)
-      gate: 每个 builder PR 必过 contract_conformance 检查（机制，确定性）
-      amendment: builder 需改契约 → 走 card_amendment.normative（planner 重入）
-      when_n_eq_1: 可省略
-
-    budget:                          # v0.2：三层预算（per_card 单层→团队封顶+开销独立池）
-      team_envelope: {usd: required, wall_clock: required}   # 硬熔断：超即冻结全队 + escalate owner
-      per_card: {tokens: required, wall_clock: required, retries: from card.risk_class}  # 非全局常量
-      overhead_pool: {usd: required} # researcher/judge/evidence-pack/escalation 独立池——让检索与升级对 agent 免费
-      on_exhaustion:
-        per_card: freeze → amendment_or_escalate（不自动放弃）
-        team: freeze → owner
+teams:                               # 团队原型（team = seats 容器 + scope 授权；声明落 registry/teams/）
+  delivery_squad:
+    scope: delivery
+    topology: leader-teammate         # leader = mechanism:scheduler（openjiuwen 形态）
+    seats: {planner: 1, test_author: 1, builder: "1..N", researcher: "0..2(as_tool)"}
+    services: [card_gate, scheduler, verifier, integrator, evidence-pack, release_bot, judge*, red_cell*]  # *按 activation
+    wave_consistency:                 # 跨卡一致性（fan-out 的真失败模式）
+      artifact: "contracts/<wave_id>.yaml"          # planner 于 plan 相产出（卡间接口/共享类型/不变量）
+      writer: planner（single_writer）；builder 改契约 → normative amendment
+      gate: 每 PR 过 contract_conformance（机制）
+      when_n_eq_1: 省略
+    cross_squad:                      # 并发波次：静态路径分区（CAS 是检测不是预防）
+      assemble_declares: owned_paths [glob...]；并发 squad 的 owned_paths 必须不相交，相交 → 拒组建或串行
     lifecycle:
       type: ephemeral
-      trigger: 波次计划获批（intent.ratified_by=owner）
-      archive_to: stewardship        # handoff: artifacts-pr/memory-distill/adr-write/trace-archive/retrospective
-      destroy: "after-handoff AND (released_behind_flag OR reverted)"   # v0.2：防"队销毁代码卡在半上线"
-
-  # ── 3.2 知识与归档（原 governance_core 拆分之一）──────────────────────
-  stewardship:                       # persistent，常设
-    mission: 归档审核 / 漂移响应 / 蒸馏入库（skill/ADR/policy）/ backlog 维护（单写者）
-    members_shape: {curator: 1}
-    mechanisms_dependent: [drift-check, metrics-aggregator]
-    external_audit: sampling_by_owner(10%)        # 抽检而非全审——注意力经济
-    backlog_role: single_writer_lock              # 见第五部分 backlog
+      trigger: intent.received        # interface-gateway 结构化后即组队——planner 随队产验收示例；
+                                      # intent.ratified 是开卡前置（scheduler 前置检查），非组队前置
+                                      # （否则首波次 planner 无所属团队、预算无池可归属）
+      archive_to: stewardship
+      handoff:                        # 销毁前强制交接（每项有执行者——无主清单=队永不销毁）
+        team_side:                    # 队侧（destroy 前，相位 handoff）
+          - {item: artifacts-pr, by: "mechanism:git（已合并 PR 天然留存）"}
+          - {item: trace-archive, by: "mechanism:metrics-aggregator（事件流归档）"}
+          - {item: retrospective, by: "seat:test_author（handoff 相位在场）"}
+        stewardship_side: [memory-distill, adr-write]   # curator 消费归档资产执行（蒸馏入库/关键决策→ADR）
+      destroy: "after-handoff(team_side) AND (released_behind_flag OR reverted)"
+      destroy_scope: "销毁=agent 实例与临时 workspace；数据层事件/制品不随队销毁（stewardship_side 据此异步消费）"
+  stewardship:
+    scope: knowledge
+    topology: single-seat
+    seats: {curator: 1}
+    services: [drift_check, metrics-aggregator, knowledge_retrieval]
+    backlog_role: proposals 多写者提交 → curator 单写者归并排序
     lifecycle: {type: persistent, destroy: manual}
-
-  # ── 3.3 红队（原 governance_core 拆分之二）────────────────────────────
-  red_cell:                          # 不是 persistent 团队——owner 直属 on-demand 共享服务
-    binding: shared_service (owner-invoked)
-    members_shape: {adversary: 1}
-    invoke_on: [重大决策前 premortem, 控制测试排期, gaming 信号触发, owner 随机抽发]
-    independence: 不与 curator 同队；findings 写入 findings.* 后由 stewardship 审核入库（跨团队=可审）
-    quota: {findings_per_week: "<= N（见 open_questions Q-E）", forced_ranking: true}   # 反告警疲劳
-    audit_of_auditor:                # 解决"审计者由谁审"的正确方式：互为指标，owner 只看两个数
-      adversary_side: 控制测试命中率（CT pass 率下降=设施漂移或 adversary 失能）
-      curator_side: findings 驳回率（过高=红队空转，过低=审核空转）
-    anti_taming:                     # 反驯化：adversary 常驻两个月后 owner 周审必然橡皮图章
-      - on-demand 调用为主 + owner 随机抽发（不可预测性即价值）
-      - forced_ranking：只上报 top-k，宁缺毋滥
-
-  # ── 3.4 事故单元 ──────────────────────────────────────────────────────
-  incident_cell:                     # adhoc，信号触发，短命
-    mission: 生产事故响应：恢复→通知→retro
-    severity_bound: [sev1, sev2]     # sev3 不开事故单元——走 delivery_squad 常规卡
-    members_shape: {responder: 1, deployer: 0..1}    # v0.2：人位移出（validate 规则统一适用于 agent）
-    principals:                      # 人类参与位（与 members_shape 分字段）
-      owner:
-        role: [approver, notifiee]
-        channels: [incidents.*]
-        ack_sla: 15m
-        on_timeout: 按动作类型写死（见 authorization——绝不临场判断）
-    recovery_preference: [rollback, flag_off, failover, forward_fix]   # 顺序即优先级；跳级须记录理由
-    authorization:                   # v0.2：按 severity 分级（"预授权=半夜自动改生产"只对 sev1 成立）
-      sev1: {preauthorized: [rollback, flag_off, failover, scale], forward_fix: owner_required}
-      sev2: {preauthorized: [flag_off, scale], rollback: "owner_ack_within(15m) else preauthorized"}
-    forward_fix_decision:
-      by: responder 提议 + owner 批（sev1）
-      requires: rollback_infeasibility_evidence（为什么回不去——进 evidence-pack）
+  incident_cell:
+    scope: operational
+    topology: single-seat（responder 主战）
+    seats: {responder: 1, deployer: "0..1"}          # 人不在 seats（principals 单列）
+    services: [evidence-pack, metrics-aggregator]    # 证据采集与 MTTR 指标；通知走 channels.human_notification
+    principals: {owner: {role: [approver, notifiee], ack_sla: 60m, on_timeout: 按 authorization 写死（60m=sev2 ack 窗，两处一致）}}
+    trigger_sources: [外部告警（体系外，显式依赖）, deployer 移交, owner 呼叫]   # 检测在体系外，此处显式声明
+    severity_classified_by: "告警源标签或 owner 指定；皆无 → sev2（保守默认——不误开 sev1 预授权；responder 无定级权）"
+    severity_bound: [sev1, sev2]      # sev3 走 delivery 常规卡
+    authorization:                    # 条件预授权（预授权动作枚举=side-effects 词表词，机器可比对 responder.allow）
+      sev1:
+        preauthorized_if: "release_record.rollback_safe AND within rollback_window"
+        actions_then: [deploy_reverse, feature_flag, failover, scale]
+        actions_else: [feature_flag, failover, scale, data_freeze]   # deploy_reverse 降级 owner_required
+        forward_fix: owner_required（须附 rollback_infeasibility_evidence 入 evidence-pack）
+      sev1_data_integrity:            # 数据类事故：默认"停止流血"而非"回到过去"
+        preauthorized: [data_freeze, feature_flag]
+        forbidden_without_owner: [deploy_reverse, forward_fix]
+      sev2:
+        preauthorized_if: 同上条件
+        actions_then: [feature_flag, scale]
+        deploy_reverse: "owner_ack_within(60m) else (rollback_safe ? deploy_reverse 预授权 : data_freeze)"
+    recovery_preference: [deploy_reverse, feature_flag, failover, forward_fix]   # 顺序即优先级；跳级须记录理由
     lifecycle:
       type: ephemeral
       ttl: 72h
-      on_ttl_expiry: "escalate_to_owner + extension_requires_owner"   # v0.2：绝不 auto-destroy（未闭环事故不得静默消失）
+      on_ttl_expiry: "escalate_to_owner + extension_requires_owner（绝不 auto-destroy）"
       archive_to: stewardship
-      exit_criteria:                 # 闭环强制点
-        declared_by: [owner, "responder(with owner ack)"]
-        requires: [service_restored, root_cause_hypothesis, followup_cards_created]   # 修复不得停留在 retro 文档里
-      handoff: [retrospective, adr-write]
+      handoff:                        # followup_cards 经 backlog.proposals 由 curator 归并（不是孤立文档）
+        team_side:
+          - {item: incident_report, by: "seat:responder"}
+          - {item: retro_24h, by: "seat:responder"}
+        stewardship_side: [retro_debt_tracking, followup_backlog_merge]
+      destroy: "exit_criteria 满足（followup_cards_created 是必要条件——修复不停留在 retro 文档）"
+      exit_criteria:
+        declared_by: [owner, responder+owner_ack]
+        requires: [service_restored, root_cause_hypothesis, followup_cards_created]
 
 # ══════════════════════════════════════════════════════════════════════════
-# 第四部分 边界公理（boundary axioms）—— 封治理旁路
-# ══════════════════════════════════════════════════════════════════════════
-boundary_axioms:
-  - axiom: incident_cell 不产生代码变更（仅 flag / config / 回滚）；一切代码修复经 delivery_squad 的卡
-    exception: "sev1 且回滚不可行 → deployer 前进修复"
-    exception_cost: 72h 内补齐 PR + ADR；逾期进 debt_register，周审必看
-  - axiom: stewardship / red_cell 不产生代码变更；产出 backlog 条目、ADR、skill、policy
-  - axiom: delivery_squad 不接触生产——合并即止（至 released_behind_flag；flag 开启是 owner 动作）
-  - axiom: 任何团队不可自扩权——members_shape 变更 = registry PR + owner 批
-
-# ══════════════════════════════════════════════════════════════════════════
-# 第五部分 团队间接口（inter-team interfaces）
+# PART 3 流与制品（flow & artifacts）
 # ══════════════════════════════════════════════════════════════════════════
 
-backlog:                             # 团队间唯一的需求入口 artifact（治理→交付的回路闭合）
-  writers: [curator, adversary, responder(retro), owner]
-  single_writer_lock: curator        # 维护与排序（写入者提交条目，curator 归并）
-  entry: {source_team, provenance, severity, proposed_card, status}
-  enforcement:
-    producer_side:                   # 强制点 1：生产侧
-      rule: planner 组建波次时必须处置 backlog top-k——每项给出 纳入 / 驳回+理由 / 延期+条件
-      gate: validate 项；未处置不得进入 build 阶段
-    consumer_side:                   # 强制点 2：消费侧（把知识资产从归档物变成开工前置条件）
-      rule: "card 必须声明 applies_adr: [...] 与 applies_skill: [...]"
-      gate: 空值需显式 justification，否则卡无法通过 validate
+flow:                                # 波次相位状态机（simulate-wave.py 消费此图——声明即执行规范）
+  phases:
+    graph:                           # 注：条件键名用 when（YAML 的 on/off 是布尔陷阱——模拟器实测发现）
+      - {from: plan,    to: build,     when: "cards.ratified AND planner.state == exited"}   # 消除同事件竞态
+      - {from: build,   to: verify,    when: pr.opened}
+      - {from: verify,  to: build,     when: review.changes_requested}      # 返工回边（必须有）
+      - {from: verify,  to: integrate, when: "gate.pass AND review.approve"}
+      - {from: any,     to: plan,      when: amendment.normative.accepted}  # planner 重入
+      - {from: integrate, to: handoff, when: "released_behind_flag OR reverted"}   # 发布后进交接相位
+    phase_order: [plan, build, verify, integrate, handoff]
+    deadlock_check: 每 phase 存在可达 exit 边（validate 校验；终态=handoff，队销毁由 lifecycle.destroy 表达）
+  event_producers:                   # 相位图与主流程引用的一切事件的生产者（悬空事件=状态机不可执行）
+    intent.received:            mechanism:interface-gateway
+    intent.ratified:            owner（经 interface-gateway 签名落事件）
+    cards.ratified:             mechanism:card-gate
+    pr.opened:                  platform（git 事件带外）
+    gate.pass:                  mechanism:verifier
+    review.approve:             seat:test_author（decision 类自述事件）
+    review.changes_requested:   seat:test_author（decision 类自述事件）
+    amendment.normative.accepted: owner
+    released_behind_flag:       mechanism:release-bot
+    reverted:                   mechanism:release-bot
+    verdict_stalemate:          mechanism:scheduler（判据：同一 PR 的 gate 与 review 结论相反且双方主张已结构化提交）
+    escape_found:               owner（经 interface-gateway/周审受理，平台落事件）
+    test_weakening:             mechanism:gate（检测 tests/acceptance 减弱型 diff）
+    pr.merged:                  platform（git 事件带外——builder 退场条件）
+    wave.frozen:                mechanism:scheduler（预算熔断/整波冻结——builder 退场条件）
+    incident.sev_alert:         platform（告警接入带外——incident_cell 组队事件）
+  verdict_layers:                    # 三层判决（review≠判卷——判卷是 verifier 机制）
+    gate:        {type: mechanism, covers: "CI/holdout/mutation/contract_conformance", output: pass/fail+evidence}
+    review:      {type: seat(test_author), question: "实现是否满足卡意图（不只是过测试）",
+                  binding: "change_class：doc 免 review；logic 必须"}
+    arbitration: {type: service(judge), trigger: builder↔test_author 僵持,
+                  routing: "'测试写错了'先走 test-author 修复路径（amendment.test_fix）；僵持才仲裁；judge 未激活 → 直达 owner",
+                  during_dispute: {run: frozen, budget_clock: paused}}   # 争议期间卡冻结（同 amendment.during）
+  merge_policy: "gate.pass AND review.approve（dep/schema 类另需 owner_ratify 第三钥）→ mechanism:integrator 自动合并（无人工；治理仓除外）"
 
-case_law:                            # 判例库（judge 中立与一致性的同时解）
-  form: versioned artifact（不是记忆——记忆是锚定载体且不可审）
-  judge_reads: [evidence-pack, case_law/]      # 仅此两项
-  judge_forbidden_reads: [team workspace, 争议方原始对话, 己方倾向性摘要]
-  on_verdict: 必须声明 follow(case_id) 或 distinguish(case_id, 区别理由)
-  entry: 新判例经 curator 审核入库（stewardship）
-  metrics:
-    deferral_rate: {meaning: judge 判"上升人类"的比例, threshold: "<= 30%", on_breach: 触发 red_cell 控制测试}
-    reversal_rate: {meaning: owner 推翻 judge 的比例}
-  rationale: |
-    对裁决者的裁决：无约束时 judge 的最优策略是把一切判越域，owner 变成唯一裁决者，
-    治理空转。deferral_rate 给 "external_audit: null" 一个具体答案。
+artifacts:                           # 制品=一切跨阶段/跨团队传递的载体（artifact_mediated 的 medium）
+  card:                              # 卡=上下文契约+预算载体+追溯单元（一切工作的原子）
+    fields_required: [id, wave_id, goal, "acceptance_refs（owner 已批验收示例 id）",
+                      capability_tags, depends_on, risk_class, change_class,
+                      "budget(tokens, wall_clock, retries, usd)", "applies_adr[]", "applies_skill[]"]
+    types:
+      feature: {acceptance: 功能断言（源自 owner 已批验收示例）}
+      spike: {acceptance: 决策文档+建议, output_must_be: ADR 草案（禁生产代码）,
+              budget: 独立硬上限, followup: 必产 feature card 或驳回理由}
+    knowledge_refs:                  # 消费侧强制点（知识资产=开工前置；候选由 knowledge_retrieval 出）
+      rule: 对机制检索的每个候选 ADR/skill 逐项 applies / not_applicable(理由)
+      forbidden: planner 自行声明"无相关 ADR"（自证不存在=仪式化入口）
+    lifecycle:                       # 卡的生命周期（amendment 并入此处，不再独立成节）
+      states: [drafting, testability_review, ratified, building, verify, merged, archived]
+      ratified_by: "service:card_gate（见 PART 2——机制输出）"
+      amendment:
+        initiator: [builder, test_author]              # amendment_request 为 artifact（见下 amendment_request），非消息
+        forbidden: builder 直写 card 任何字段
+        classify:
+          non_normative: {fields: [实现提示, 参考链接, 拆分粒度], apply: auto, veto: owner(sampling)}   # 无需 planner 重入
+          test_fix:     {fields: [测试树修正（非减弱型）], initiator: test_author, apply: auto,
+                         guard: "减弱型（删测试/删断言/放宽阈值/加 skip）不走此类——降级为特权变更：新卡+owner 批+test_weakening 事件"}
+          normative:     {fields: [acceptance_criteria, 验收引用, 契约], approver: owner（改验收=改需求）,
+                          attention_class: asynchronous_review（日批窗口，见 attention-ledger）,
+                          default_on_timeout_24h: "卡冻结+退回 backlog+波次继续其余卡（默认绝不 approve）"}
+        executor: card_gate 计数与分类（escalate_when 判定）；classify 三类互斥由机制判定
+        during: {run: frozen, budget_clock: paused}     # 不惩罚诚实方
+        escalate_when: "同一卡 normative amendment >= 2（卡有问题回炉）；同波次 > 3 → 冻结新开卡+escalate owner（是否整波回炉由 owner 裁——不自动）"
+        metrics: amendment_rate 归因 planner（产卡质量）；amendment 不计发起方失败率
+  amendment_request:                 # 改卡请求（artifact——经 cards.* 频道落数据层，schema 见 registry/schemas）
+    fields: [card_id, initiator, proposed_fields, justification, classify(non_normative|test_fix|normative)]
+    executor: mechanism:card-gate（分类/计数/冻结时钟）；normative 批准=owner 事件（amendment.normative.accepted）
+  evidence_pack:                     # 争议证据（机制采集；judge 唯一消费面——只读，禁争议方转述）
+    producer: mechanism:evidence-pack（重跑争议测试/采日志与哈希 → 不可变）
+    fields: [card, acceptance_criteria, 相关 contract, 失败断言 id+原始输出,
+             双方主张（结构化字段，禁自由文本）, version_read]
+  release_record:                    # release_bot 于每次部署 behind flag 时写入
+    fields: [rollback_safe, rollback_window, flag_ids, wave_id]
+    note: "rollback_safe=false 当且仅当发布含 contract 相迁移/不可逆副作用"
+    consumers: [incident_cell.authorization, drift-check]
+  test_assets:                       # 测试资产（对抗双方各有人盯：builder 造假的信号、test_author 扩权的闸）
+    visible_suite: {by: test_author, readable_by: [builder]}
+    holdout_suite:
+      by: test_author
+      location: 独立私有仓（同仓 clone 即可读——不做假隔离声明）
+      readable_by: [gate]
+      ratio: ">=30% acceptance 断言"
+      regenerate_per_card: true
+      activation: "PART 5（首 gaming 嫌疑 OR risk_class=high OR change_class ∈ [schema, dep] 才开——首开不依赖 holdout 自身信号，防循环依赖）"
+    hard_rules:
+      - builder PR 触及 tests/acceptance/**（判决树）→ 强制 test_author review（gate 路径检查，不可自批）；
+        tests/unit/** 属 builder 正常工作面（设计工具），不触发
+      - holdout 失败且 visible 全绿 → gaming 嫌疑进 findings（builder 申诉经 escalation 载体 evidence-pack 附 finding 副本——builder 无 findings 频道直读权）
+      - traceability: 每条 holdout/visible 断言映射 card.acceptance_criteria_id；无映射断言不得作 gate 失败依据
+                      （堵 test_author 借断言扩验收范围——builder spec gaming 的镜像）
 
-release_path:                        # merge→prod 责任归属（v0.2 补空洞：方案 A）
-  model: trunk-based + feature flag
-  delivery_boundary: "delivery_squad mission 延伸到 released_behind_flag；flag 开启 = owner 动作"
-  deployer_presence: 仅 incident_cell（正常发布路径无 deployer 成员位）
-  schema_carve_out:                 # flag 盖不住 schema migration
-    expand_phase: 可 flag（方案 A 适用）
-    contract_phase: 维持 change-classes.schema 级门禁（owner_ratify + migration-dry-run + backup-verified）后才允许自动部署
-  template_requirement: feature flag 脚手架为项目模板默认件（落 template-service 待办）
-
-# ══════════════════════════════════════════════════════════════════════════
-# 第六部分 owner 注意力预算（principal attention budget）
-# ══════════════════════════════════════════════════════════════════════════
-# 注意力是本系统唯一不可扩容资源；像预算一样显式声明并熔断。
-# 不做这层的结局：两周内 owner 放弃大半阻塞点 → 体系退化成名义治理（比没有更糟）。
-principal_attention_budget:
-  synchronous_blocking:              # 必须人在场——保持极少（<= 2 次/周）
-    - intent ratification（波次级，不是卡级）
-    - sev1 forward_fix 授权
-    - registry/teams 结构变更（members_shape 等）
-  asynchronous_review:               # 批量、可延迟、有默认动作
-    - {item: 周审三件套（drift/CT 报告/escape 周报）, window: "<= 60min 固定时窗"}
-    - {item: judge deferral 队列, default: "超 24h 未处理 → 按 judge 建议执行 + 留痕"}
-  auto_with_veto:                    # 默认放行 + 事后否决权——把审批降级为抽检
-    - non_normative amendment
-    - backlog 纳入决策
-  sampling_instead_of_gating:
-    - 归档审核：curator 全审 → owner 抽 10%
-  conservation_rule: 任何新增 owner-blocking 点，必须同时移除一个   # 防阻塞点单调增长
-  on_timeout_rule: 一切人在环点必须有写死的默认动作（无默认动作 = owner 缺席时状态未定义 = 禁止上线）
-
-# ══════════════════════════════════════════════════════════════════════════
-# 第七部分 组装硬规则（composition rules）
-# ══════════════════════════════════════════════════════════════════════════
-composition_rules:
-  mutex:
-    - {rule: "planner↔builder：不同 phase 在场（时序互斥）", scope: 全组织}
-    - {rule: builder↔test_author 不得同声明, scope: 全组织}
-    - {rule: 同一 agent 不得同时在 ephemeral 团队与 persistent 团队担任成员, scope: 全组织, reason: 职责漂移}
-    - {rule: 同一 agent 实例不得兼任两个互斥座位, scope: 全组织, note: 永不放松（degraded_mode 也不放）}
-  independence:                      # 族级（+降级路径见 degraded_mode）
-    - test_author 族 ≠ 队内任一 builder
-    - judge 族 ≠ 争议双方（builder/test_author）
-  jurisdiction:
-    - judge 管辖域枚举落团队声明；仅 owner 可改（CT-JDG-003）
-    - 越域 escalation 必达 owner（judge 判"上升人类"是义务不是失败；受 deferral_rate 约束）
-  isolation:
-    - builder 工作区=team；test_author/judge/adversary=hermetic 或 private（不共享草稿记忆）
-    - 记忆不是规范来源：跨队可复用的是 artifact 与蒸馏后的 skill/ADR，不是记忆
-  workspace_memory_acl:
-    - 记忆命名空间按 agent 隔离；团队共享只允许经 artifacts/ 目录（版本化）
-    - 记忆条目带 provenance+TTL+confidence；builder 不可写任何 test_author/judge 可读命名空间
-  budget:
-    - 无预算不开队：ephemeral 组建必带三层预算声明（team/per_card/overhead）
-
-# ══════════════════════════════════════════════════════════════════════════
-# 第八部分 生命周期共律（lifecycle commons）
-# ══════════════════════════════════════════════════════════════════════════
-lifecycle_commons:
-  assemble: 声明（registry/teams/*.yaml PR）→ validate（时序形状/互斥/独立性/预算/依赖 DAG）→ owner 批 → 实例化（生成 team_instance_id）
-  run: 事件流驱动；scheduler 状态机推进；一切过界内容带信封；一切 artifact 写入带 attestation
-  handoff: 完成即归档（artifacts-pr/memory-distill/adr-write/trace-archive/retrospective）
-  destroy: 按 team 声明的 destroy 条件（delivery_squad 含 released_behind_flag）；销毁审计留痕（team_destroyed 事件）
-  sedimentation:                     # 资产沉淀去向（过程数据三分离的团队面）
-    声明与决策: git（registry/ADR）
-    事件: 数据层（append-only+哈希链）
-    原始轨迹: 对象存储（滚动 30 天）
-    知识: 蒸馏为 skill/policy/ADR 入库（curator 审核后才可复用——复用入口=backlog 强制点）
-
-# ══════════════════════════════════════════════════════════════════════════
-# 第九部分 运行补齐（operational completions）
-# ══════════════════════════════════════════════════════════════════════════
-
-instance_identity:                  # 座位绑定——事后可追溯"这行代码是哪个 builder 写的"
-  team_instance_id: "<ulid>"
-  seat_bindings: [{seat: "builder#1", agent_id, agent_version, model_alias, family, bound_at}]
-  attestation: 每个 PR / artifact 必带 (team_instance_id, seat, agent_id)
-  why_runtime: 装配时校验族独立性不够（模型可能被热更新）——判决/合并时按 attestation 复核
-
-degraded_mode:                      # 只有 2-3 个可用模型时的降级路径（不设计=以后手关规则）
-  when: 可用族数 < 独立性需求
-  allow: [同族不同实例, holdout_ratio 提至 50%, owner 逐卡 ack]
-  forbid: 同一 agent 实例兼任两个互斥座位   # 永不放松
-  record: degraded_reason 入事件流，周审必看
-
-card_types:                          # 卡的分型（"无卡不开工"需要诚实的出口）
-  feature: {acceptance: 功能断言（owner 已批验收示例）}
-  spike:
-    acceptance: 决策文档 + 建议
-    output_must_be: ADR 草案（不得含生产代码）
-    budget: 硬上限（独立于 feature 卡预算）
-    followup: 必须产出 feature card 或驳回理由   # spike 不得成为无验收工作的永久避风港
-  card_fields:                       # subordinate 确定性分派的前置（scheduler 非 LLM）
-    capability_tags: required        # 分派路由依据
-    depends_on: [card_ids]           # validate 校验依赖图为 DAG（环=死锁卡组，拒绝）
+interfaces:                          # 团队间接口（全部 artifact_mediated；读写权限见 channels.acl 唯一真源）
+  backlog:                           # 治理→交付的回路（唯一需求入口；读写权限见 channels.acl）
+    flow: "proposals（多写者）→ curator 单写者归并排序 → merged；adversary 经 findings 由 curator 审核转化（不直写提案）"
+    producer_gate: planner 组建波次必处置 top-k——每项 纳入/驳回+理由/延期+条件（条件须机器可判定）
+    consumer_gate: 卡的 knowledge_refs 处置（见 artifacts.card.knowledge_refs）
+  case_law:                          # 判例库（版本化 artifact，非记忆——记忆是锚定载体且不可审）
+    entry: "judge 判决经 curator 审核入库；normative: false（提升为 policy/ADR 前无规范力）"
+    judge_duty: 判决须对机制检索出的候选判例逐项 follow/distinguish（禁自证"无相关判例"）
+    research_verified: "进 ADR/卡的研究结论必须带 URL+取回时间+摘录，写入时机制校验可达性；
+                        存量不可达 → 标 unverified-archived，禁作验收依据（不删档）"
 
 # ══════════════════════════════════════════════════════════════════════════
-# 开放问题（v0.1 Q-A..Q-D 已裁决，记录于 disposition；以下为 v0.2 新增待定参数）
+# PART 4 约束（constraints）
 # ══════════════════════════════════════════════════════════════════════════
-open_questions:
-  - Q-E: red_cell 的 findings_per_week 上限 N 与 forced_ranking 的 top-k 取值？
-      倾向：N=3, top-k=5（宁缺毋滥）——待运行数据校准。
-  - Q-F: attention_budget 的数字定版（同步阻塞 <=2/周、周审 <=60min、deferral 默认 24h）？
-      倾向：先按上述试运行一个月，用 metrics-aggregator 的实际耗时数据回调。
-  - Q-G: backlog top-k 的 k 值与"延期+条件"的条件格式？
-      倾向：k=5；条件必须是可机器判定的日期或事件（如"待 ADR-0011 裁决后"）。
-  - Q-H: holdout 独立仓名与访问凭据方案（CI 专用 GitHub App？environment 门禁？）？
-      倾向：org 私有仓 <org>/holdout-tests + CI 专用 App（只读 contents，无 PR 权）。
+
+axioms:
+  boundary:                          # 边界公理（= scopes 的运行时断言）
+    - "incident_cell 不产代码变更（仅 flag/config/回滚）；代码修复必经 delivery 卡
+       exception: sev1 且回滚不可行 → deployer 前进修复；72h 内补 PR+ADR，逾期进 debt_register"
+    - "stewardship/red_cell 不产代码；产出 backlog 条目/ADR/skill/policy"
+    - "delivery_squad 不触生产（至 released_behind_flag；flag 开启是 owner 动作）"
+    - "任何团队不可自扩权：按已注册原型实例化=自动；原型/seats/members 变更=registry PR+owner 批"
+  non_delegable:                     # 不可委派三件（委派任一 = 验收链自证循环）
+    - intent 的验收示例（谁定义"做对了"）
+    - feature flag 开启（谁决定"用户看见"；关闭/kill-switch 是恢复动作——responder 预授权，不在此列）
+    - schema contract 相迁移批准（谁承担不可逆）
+  default_action:                    # 默认动作推导原则（不逐项拍）
+    principle: 默认动作永远选择"事后撤销代价更小"的一侧
+    corollaries:
+      - 扩大验收/触生产/降门禁 → 默认拒绝或冻结，绝不默认放行
+      - 只耗时不改语义（检索/升级/重试）→ 默认放行
+      - 无法判定哪侧更可逆 → 不得设为人在环点，先拆到可判定
+
+budget:                              # 三层预算 + 不变式（invariants 优先级高于一切池规则）
+  layers: {team_envelope: "usd+wall_clock 硬熔断，超即冻结全队+escalate owner",
+           per_card: "tokens/wall_clock/retries（retries 按 risk_class，非全局常量），耗尽 → freeze+amendment_or_escalate",
+           overhead_pool: "researcher/judge/evidence-pack/escalation——让检索与升级对 agent 免费"}
+  invariants:
+    - escalation 与 judge 调用永不受任何预算约束；预算耗尽本身即 escalation 事件（提出问题不花自己预算）
+
+attention:                           # owner 注意力账本 → 独立文件 standards/attention-ledger.yaml（validate 校验）
+  ledger_ref: standards/attention-ledger.yaml
+  conservation_rule: 新增 owner-blocking 点必须同时移除一个（账本为证，非口号）
+
+metrics:                             # 指标层通则：低事件密度下比率无信息量 → 两栏制
+  absolute_signals:                  # 绝对信号：零样本即触发（不需 min_sample）
+    examples: [控制测试首次未命中 → 立即人工, red_cell 连续 3 次零有效 findings → 暂停两周,
+               holdout/visible 分裂 → gaming finding]
+  ratio_metrics:                     # 比率指标：min_sample 以下只累积不触发自动动作；表达为绝对计数+滚动窗口
+    examples: [deferral_rate（仅"域内该判却推给人"，越域义务不计入——防反向激励）,
+               test_defect_rate（争议裁定"测试写错"计数，归因 test_author——对称于 amendment_rate 归因 planner）,
+               reversal_rate, escape_rate, amendment_rate]
+    validity: {min_sample: 10, below: "只累积，不自动触发"}
 
 # ══════════════════════════════════════════════════════════════════════════
-# 附：二审意见处置记录（disposition）
+# PART 5 生效（activation）——文档全量声明，生效按机器可判定触发
 # ══════════════════════════════════════════════════════════════════════════
-disposition:
-  accepted_verbatim:                 # 全盘采纳
-    - "注意力预算三层 + conservation_rule + on_timeout 全局规则（第六节）"
-    - "card_amendment 全流程含 budget_clock: paused 与 amendment 归因 planner"
-    - "boundary_axioms 四条（封 incident_cell 旁路）"
-    - "governance_core 拆 stewardship + red_cell；互为指标；quota/forced_ranking"
-    - "holdout_suite 升一期；holdout/visible 分裂→findings"
-    - "members_shape 时序化；test_author 前移 plan 阶段"
-    - "三层预算 + overhead_pool（检索与升级免费）"
-    - "merge→prod 方案 A + destroy 含 released_behind_flag"
-    - "backlog 双强制点（planner 必处置 / card 必引 ADR+skill）"
-    - "case_law artifact + deferral_rate<=30%"
-    - "通知模板四行 + 默认动作"
-    - "Q-D 判据 + do_now_anyway（research_cache/ 共享 artifact）"
-    - "Q-A 强论证（跨生命周期唯一可行范式）+ CAS/single_writer/staleness"
-    - "instance_identity / degraded_mode / spike card / capability_tags + DAG"
-    - "incident_cell：principals 分离 / severity_bound / on_ttl_expiry=escalate / exit_criteria 含 followup_cards"
-    - "cross_card contracts artifact + conformance gate（选方案一，不加成员位）"
-  accepted_with_modification:
-    - "Q-B：接受共享结论与 case_law/deferral_rate；纠正前提——hermetic 指无共享记忆，judge 个人判例索引存在，
-       '锚定'风险真实；但修复方案（判例降格为 artifact）优于我的原设计，理由替换为取证范围隔离+一致性+成本"
-    - "verdict_layers.review：接受三层，但 review 定位为'意图符合性审查'而非判卷（防 v3 拆掉的元层自证回潮），
-       且按 change-classes 绑定；'测试写错了'主张先走 test-author 修复路径，僵持才进仲裁"
-    - "方案 A 的 schema carve-out：expand/contract 两相区分，contract 相维持 owner_ratify+dry-run+backup"
-    - "holdout readable_by: [gate]：同仓 clone 即可读——落地为独立私有仓+CI 双 checkout+断言 id-only 回报，
-       不留假隔离声明"
-  rejected: []                       # 本轮无整体拒绝项
+# 原则：未触发的机制不实现、不维护；触发条件必须是机器可判定事件。
+# 这是对一人公司的诚实设计：体系本身不能成为注意力的最大消费者。
+activation:
+  now:                               # 成本近零/防不可逆 → 立刻生效
+    - 机制基底：全部机制原型与 services（scheduler/verifier/integrator/evidence-pack/interface-gateway/
+      metrics-aggregator/card-gate/release-bot/knowledge-retrieval/drift-check）——代码实现即生效，
+      activation 只治理 LLM 服务与重设施（机制无"待触发"状态，被依赖即工作）
+    - axioms（boundary+non_delegable+default_action）
+    - budget（三层+invariants）
+    - write_exclusion + phases（状态机与写锁）
+    - card_gate + card 模型（fields/types/knowledge_refs）+ amendment_request
+    - attention_ledger
+    - release_record（rollback_safe——P0 数据安全）
+    - interfaces 双强制点（backlog producer_gate/consumer_gate）
+    - channels（信封+ACL+通知模板）+ flow.event_producers
+  on_trigger:                        # 触发才实现
+    holdout_suite:      {when: "首个 gaming 嫌疑 OR risk_class=high OR change_class ∈ [schema, dep]"}
+    judge_service:      {when: "builder↔test_author 僵持累计 >= 2（此前僵持直达 owner——你比 judge 便宜）"}
+    case_law:           {when: "judge 争议累计 >= 5（判例密度不足时无一致性问题可解；计数器=metrics-aggregator 计 judge verdicts）"}
+    red_cell:           {when: "首次上线后 OR 首个 sev1 后"}
+    contracts_wave:     {when: "builder N > 1"}
+    cross_squad_paths:  {when: "并发 squad > 1"}
+    metrics_auto:       {when: "对应指标样本 >= min_sample"}
+    degraded_mode:      {when: "可用族数 < 激活中的独立性需求（family_priority 动态排：judge>test_author>builder，未激活的不占族）"}

@@ -9,4 +9,4 @@ implementation:
   repo: openJiuwen/jiuwenswarm           # 编排框架内置
   path: builtin/bash
 status: approved
-owner: team:governance-core
+owner: team:stewardship

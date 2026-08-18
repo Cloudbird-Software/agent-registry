@@ -15,7 +15,7 @@ classes:
     scope: 业务代码/测试
     card: required
     gate: [unit, acceptance, hidden(二期), "mutation>=T"]
-    review: verifier（机制判决）
+    review: test_author（意图符合性——team-collaboration verdict_layers.review；判卷=verifier 机制，两者不混称）
     merge: integrator auto（required checks 全绿 + verifier verdict + 卡号 metadata）
   dep:
     scope: 依赖新增/升级
@@ -34,8 +34,8 @@ classes:
     scope: 生产环境变更
     card: required
     gate: [smoke, canary]
-    review: owner_per_action      # RL-1
-    merge: deployer 执行（非 git 合并语义）
+    review: owner_per_action      # RL-1；=flag 开启/环境审批（non_delegable）
+    merge: "release_bot behind flag（自动+写 release_record）；flag 开启=owner；sev1 前进修复=incident_cell.deployer（owner_required）"
 expedited:
   rule: 允许降级走快速道，但必须 N<=3 天内补 retro-ADR；curator 追踪为带期限的债（与 incident retro 债同机制）
   audit: 破玻璃直推仍被 drift-check §8 曝光，24h 回填不变

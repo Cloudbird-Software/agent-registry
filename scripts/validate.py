@@ -80,9 +80,54 @@ for _grp in (_se.get("groups") or {}).values():
     VOCAB.update(_grp.keys())
 CT_REG = (load_yaml(ROOT / "standards" / "control-tests.yaml") or {}).get("tests", {})
 # 标准文件可解析性（flows/change-classes 暂无结构校验，先保证解析不失败——CodeRabbit #5）
-for _std in ("flows.yaml", "change-classes.yaml"):
+for _std in ("flows.yaml", "change-classes.yaml", "team-collaboration.yaml", "attention-ledger.yaml"):
     if (load_yaml(ROOT / "standards" / _std) or {}) == {}:
         fail(f"standards/{_std} 缺失或解析为空（标准文件必须可解析，ADR-0010）")
+
+# attention-ledger 断言（team-collaboration v1.0：conservation_rule 的硬表达）
+_LEDGER = load_yaml(ROOT / "standards" / "attention-ledger.yaml") or {}
+_sync = _LEDGER.get("synchronous") or []
+_max = _LEDGER.get("max_synchronous_per_week")
+if _max is not None and len(_sync) > _max:
+    fail(f"attention-ledger: synchronous 阻塞点 {len(_sync)} 个 > 上限 {_max}（conservation_rule 违反——新增必须移除一个）")
+for _entry in _sync:
+    if isinstance(_entry, dict) and not (_entry.get("default") or _entry.get("why_blocking")):
+        fail(f"attention-ledger: synchronous 项 {_entry.get('item')} 缺 default 且缺 why_blocking（人在环点必须有确定行为或不可默认理由）")
+for _entry in _LEDGER.get("asynchronous") or []:
+    if isinstance(_entry, dict) and not any(str(_k).startswith("default") for _k in _entry):
+        fail(f"attention-ledger: asynchronous 项 {_entry.get('item')} 缺 default/default_Nh（无默认动作=owner 缺席时状态未定义）")
+
+# team-collaboration v1.0 结构断言：相位图无死锁（每 phase 有出边或为终态）
+_TC = load_yaml(ROOT / "standards" / "team-collaboration.yaml") or {}
+_graph = ((_TC.get("flow") or {}).get("phases") or {}).get("graph") or []
+_order = ((_TC.get("flow") or {}).get("phases") or {}).get("phase_order") or []
+if _graph and _order:
+    _terminal = {"handoff"}   # 终态（波次出口；队销毁由 lifecycle.destroy 表达）
+    for _ph in _order:
+        if _ph in _terminal:
+            continue
+        if not any(str(e.get("from")) in (_ph, "any") and e.get("when") is not None for e in _graph):
+            fail(f"team-collaboration: phase '{_ph}' 无出边（死锁相位）")
+
+# 相位图事件的生产者完整性（flow.event_producers——悬空事件=状态机不可执行）
+_evt_prod = (_TC.get("flow") or {}).get("event_producers") or {}
+for _e in _graph:
+    for _tok in str(_e.get("when", "")).replace("AND", " ").replace("OR", " ").split():
+        _k = _tok.rstrip(")").split("(")[0].strip()
+        if _k and "." in _k and _k not in _evt_prod and not _k.startswith(("planner", "builder", "wave")):
+            fail(f"team-collaboration: 相位边事件 '{_k}' 无生产者（flow.event_producers 缺项）")
+
+# services 成员引用：服务型座位绑定的 agent 必须存在且 approved（走查 P1：arbiter proposed 曾逃逸校验）
+OK = {"approved", "deprecated"}
+ACTIVE = {"approved", "active"}
+for _svc, _sdef in ((_TC.get("services") or {}).items()):
+    for _m in (_sdef.get("members") or []) if isinstance(_sdef, dict) else []:
+        _aid = str(_m).removeprefix("agent:").split("@")[0]
+        _ag = agents.get(_aid)
+        if _ag is None:
+            fail(f"services.{_svc} 绑定不存在的 agent:{_aid}")
+        elif _ag.get("status") not in OK:
+            fail(f"services.{_svc} 绑定未批准的 agent:{_aid} (status={_ag.get('status')})")
 
 # profiles 字段取值域（防 agent 与 profile 同时用错值时仍通过——CodeRabbit #5）
 _ENUMS = {
@@ -103,9 +148,6 @@ if GW_CFG.exists():
     gw_aliases = {m.get("model_name") for m in gwc.get("model_list", []) or []}
     if gw_aliases != model_aliases:
         fail(f"deploy/llm-gateway/config.yaml 的别名 {sorted(gw_aliases)} 与 models.yaml {sorted(model_aliases)} 不一致（ADR-0002 rev1）")
-
-OK = {"approved", "deprecated"}
-ACTIVE = {"approved", "active"}
 
 # ---- profiles 自检：structural 三字段非空 + CT 登记（CT-ADV-003）----
 LLM_ARCHETYPES = set()
@@ -210,6 +252,15 @@ for aid, a in agents.items():
                 fail(f"agent:{aid} {key} 逃逸 registry 目录: {pr}")
             elif not p.is_file():
                 fail(f"agent:{aid} {key} 文件不存在: {pr}")
+    # io_contract.schema_ref 存在性（输出 schema 是信任机制地基——走查 P1：曾集体悬空）
+    for side in ("input", "output"):
+        sr = ((a.get("io_contract") or {}).get(side) or {}).get("schema_ref")
+        if sr:
+            sp = (REG / sr).resolve()
+            if not sp.is_relative_to(REG.resolve()):
+                fail(f"agent:{aid} schema_ref 逃逸 registry 目录: {sr}")
+            elif not sp.is_file():
+                fail(f"agent:{aid} schema_ref 文件不存在: {sr}")
     sr = (a.get("workflow") or {}).get("steps_ref")
     if sr:
         s = (REG / sr).resolve()
@@ -218,11 +269,21 @@ for aid, a in agents.items():
         elif not s.is_file():
             fail(f"agent:{aid} steps_ref 文件不存在: {sr}")
 
-# ---- 族独立性：跨 agent 比对（team 内成对检查见下；此处查 family 缺失）----
+# ---- 族独立性：全局比对（服务型座位不落任何 team pool——走查 P0：judge 与 test-author 同族曾逃逸 team 级检查）----
+_by_arch: dict = {}
+for aid, a in agents.items():
+    _by_arch.setdefault(a.get("archetype"), []).append(aid)
 for aid, a in agents.items():
     need = a.get("_must_differ_family_from") or []
     if need and not a.get("_family"):
         fail(f"agent:{aid} 声明了 independence 但 model.alias 无 family 映射（models.yaml 缺 family？）")
+    for arch in need:
+        for other in _by_arch.get(arch, []):
+            if other == aid:
+                continue
+            if a.get("_family") and agents[other].get("_family") == a.get("_family"):
+                fail(f"agent:{aid}({a.get('archetype')}) 与 agent:{other}({arch}) 同模型族 {a.get('_family')}"
+                     f"（族级独立性，全局比对——ADR-0010；team 级检查覆盖不到服务型座位）")
 
 # ---- tool 校验 ----
 for tid, t in tools.items():
@@ -230,6 +291,14 @@ for tid, t in tools.items():
     bad = fx - VOCAB
     if bad:
         fail(f"tool:{tid} side_effects 含词表外值: {sorted(bad)}（side-effects.yaml v2）")
+    for side in ("input", "output"):
+        sr = ((t.get("io_contract") or {}).get(side) or {}).get("schema_ref")
+        if sr:
+            sp = (REG / sr).resolve()
+            if not sp.is_relative_to(REG.resolve()):
+                fail(f"tool:{tid} schema_ref 逃逸 registry 目录: {sr}")
+            elif not sp.is_file():
+                fail(f"tool:{tid} schema_ref 文件不存在: {sr}")
 
 # ---- skill 校验 ----
 for sid, s in skills.items():

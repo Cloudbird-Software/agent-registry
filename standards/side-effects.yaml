@@ -35,11 +35,14 @@ groups:
   supply:                      # 供应链（一人公司高频风险：幻觉依赖/抢注）
     dependency_add:   新增/升级依赖（manifest 锁定物变更）
     package_publish:  发布包/镜像
-  infra:                       # 生产
-    deploy_forward:   前进变更（部署/扩容/迁移开关）
+  infra:                        # 生产
+    deploy_forward:   前进变更（部署新版本/迁移开关）
     deploy_reverse:   回滚/降级/回退迁移——responder 的预授权恢复动作
     feature_flag:     翻特性开关（含 kill switch）
+    failover:         切换灾备/备用实例（流量切换，不动代码）——responder 预授权恢复动作
+    scale:            容量伸缩（扩容/缩容——容量恢复动作，非代码前进）——responder 预授权恢复动作
     schema_migrate:   数据库 schema 变更
+    data_freeze:      冻结写入（停止流血动作：只读锁/停写入队列——非删除非回滚，可逆）
     data_delete:      删数据（不可逆；最高审）
     secret_read:      读生产密钥（environment 门禁 + RL-1）
 # 特殊值：none —— 纯函数工具（如 read_file）无副作用

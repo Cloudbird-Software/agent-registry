@@ -1,32 +1,45 @@
 id: dev-wave
-version: 2.0.0
+version: 3.0.0
 status: approved
-goal: 按波次交付服务模块：owner 批验收示例→test-author 出题冻结→builder 实现→verifier 机制判卷→integrator 合并，单波单仓
+archetype: delivery_squad
+scope: delivery
+goal: 按波次交付服务模块：intent（owner 批）→card_gate→test_author 出题冻结→builder 实现→verifier 判卷→integrator
+  合并→release_bot 上线 behind flag
 members:
-- agent: agent:backend-dev
-  count: 2
+- agent: agent:wave-planner
+  seat: planner
+  count: 1
   as_tool: false
 - agent: agent:reviewer
+  seat: test_author
+  count: 1
+  as_tool: false            # 实体座位（plan/build/verify/handoff 四相位在场——多轮 review 回路装不进 as_tool 单次往返）
+- agent: agent:backend-dev
+  seat: builder
+  count: 2
+  as_tool: false
+- agent: agent:researcher-code
+  seat: researcher
   count: 1
   as_tool: true
-topology: leader-teammate（leader=scheduler 机制，非 LLM 原型）
+topology: leader-teammate（leader = mechanism:scheduler，openjiuwen 形态）
 orchestration:
-  assign: scheduler 状态机（按卡分派，预算熔断：重试≤1 同参，超限回 planner）
-  merge: integrator 机制（状态函数：checks 全绿+verifier verdict+卡号 metadata）——无 agent 持有合并权
-  workflow_ref: workflows/dev-wave.flow.yaml
+  assign: scheduler 状态机按卡分派（capability_tags 路由；预算熔断 per budget.invariants）
+  merge: integrator 机制（gate.pass AND review.approve；无 agent 持合并权）
+  release: release_bot 部署 behind flag 并写 release_record（rollback_safe 等）
+  phases_ref: standards/team-collaboration.yaml#flow.phases（相位状态机单一真源，不在此重复）
 verification:
   test_authors:
   - agent:reviewer
-  verdict_by: mechanism:verifier（跑 test_tree_sha 冻结树，required status check）
+  verdict_by: mechanism:verifier（对 test_tree_sha 冻结树运行）
   coverage: all-outputs
   external_audit:
-    team: team:governance-core
+    team: team:stewardship
     frequency: weekly
     method:
     - metrics-anomaly
     - escape-review
     - re-check-sample
-    - retrospective-review
 workspace:
   shared:
     root: env:TEAM_WORKSPACE_ROOT
@@ -35,24 +48,29 @@ workspace:
     inbox: inbox/
     artifacts: artifacts/
     decisions: decisions/
+    contracts: contracts/
 storage:
   type: postgresql
   ref: env:TEAM_DB_DSN
+budget:
+  team_envelope:
+    usd: env:TEAM_USD_CAP
+    wall_clock: env:TEAM_WALL_CLOCK
+  per_card: 按 card.risk_class（卡字段声明）
+  overhead_pool:
+    usd: env:TEAM_OVERHEAD_USD
+  invariants_ref: standards/team-collaboration.yaml#budget.invariants（升级通道永不冻结）
 lifecycle:
   type: ephemeral
-  archive_to: team:governance-core
-  handoff:
-  - artifacts-pr
-  - memory-distill
-  - adr-write
+  trigger: intent.received        # 组队即 planner 入场产验收示例；intent.ratified=开卡前置（非组队前置）
+  archive_to: team:stewardship
+  handoff:                        # 执行者见 team-collaboration PART 2 delivery_squad.lifecycle.handoff
+  - artifacts-pr                  #   team_side: mechanism:git / mechanism:metrics-aggregator / seat:test_author
   - trace-archive
   - retrospective
+  - memory-distill                #   stewardship_side: curator 消费归档资产执行
+  - adr-write
   destroy_policy: after-handoff
-budget:
-  per_card:
-    tokens: required
-    wall_clock: required
-    retries_max: 1
-    usd: required
+  destroy_condition: released_behind_flag OR reverted   # 完整条件见 PART 2（destroy_scope：数据层制品不随队销毁）
 channels:
 - web

@@ -7,4 +7,4 @@ input: {schema_ref: schemas/write-in.json}
 output: {schema_ref: schemas/write-out.json}
 implementation: {repo: openJiuwen/jiuwenswarm, path: builtin/write_file}
 status: approved
-owner: team:governance-core
+owner: team:stewardship
