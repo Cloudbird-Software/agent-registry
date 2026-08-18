@@ -12,7 +12,10 @@ model:
 capabilities:
   skills: []                  # planning skill 待 teams 轮设计时随流程定义
   tools: [tool:read_file, tool:write_file, tool:web_search]
-  # 检索增强（researcher-code）经 team 组装层以 as_tool 接入，不进本白名单（agent≠tool）
+  agent_tools: [agent:researcher-code]     # 现状调研（agent-as-tool 经 capabilities.agent_tools 声明）
+workflow:
+  mode: fixed
+  steps_ref: workflows/wave-planner.steps.md
 permissions:
   inherit: org-default
   mode: normal
