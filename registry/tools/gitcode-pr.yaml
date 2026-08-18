@@ -9,4 +9,4 @@ implementation:
   repo: Cloudbird-Software/agent-tools
   path: tools/gitcode_pr
 status: approved                        # proposed → approved 须经 PR 评审（AR-2）
-owner: team:governance-core
+owner: team:stewardship

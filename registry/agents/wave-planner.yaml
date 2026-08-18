@@ -1,21 +1,31 @@
 id: wave-planner
-version: 2.0.0
-status: proposed          # 首个 team 引用时随 PR 提级 approved（本轮为定义落盘，未经实战）
+version: 2.1.0
+status: approved
 archetype: planner
 trust_zone: trusted_control
-role: "工作源头：意图→验收示例（owner 批）→波次计划+工作卡+测试规格；只写计划产物，不写实现"
+role: 工作源头：意图→验收示例（owner 批）→波次计划+工作卡+测试规格；只写计划产物，不写实现
 identity:
   prompt_ref: identities/wave-planner.md
 model:
-  alias: coder-deep           # 规划是重认知任务，用旗舰档
+  alias: coder-deep
   temperature: 0.3
   reasoning_level: high
 capabilities:
-  skills: []                  # planning skill 待 teams 轮设计时随流程定义
-  tools: [tool:read_file, tool:write_file]   # 无 web_search：planner 属 trusted_control，外部资料一律经 researcher（P0-8）
-  allow: [fs_read, fs_write_repo, vcs_read, datastore_read, datastore_write, memory_read, memory_write]
+  skills: []
+  tools:
+  - tool:read_file
+  - tool:write_file
+  allow:
+  - fs_read
+  - fs_write_repo
+  - vcs_read
+  - datastore_read
+  - datastore_write
+  - memory_read
+  - memory_write
   agent_tools:
-    refs: [agent:researcher-code]           # 现状调研（外部结论仅作背景，不作规范依据）
+    refs:
+    - agent:researcher-code
 isolation: private
 approval: auto
 workflow:
@@ -24,23 +34,29 @@ workflow:
 permissions:
   inherit: org-default
   overrides:
-    # 仅允许写顶层 plans/|cards/|specs/（相对本 agent 工作区根）；其余显式 deny
-    # 顶层锚定避免 src/plans/ 之类任意深度绕过（CT-PLN-001 声明层配合）
-    - {tools: [tool:write_file], pattern: "re:^(?!(plans|cards|specs)/).*$", action: deny, severity: HIGH}
+  - tools:
+    - tool:write_file
+    pattern: re:^(?!(plans|cards|specs|contracts)/).*$
+    action: deny
+    severity: HIGH
 memory:
-  types: [semantic]
+  types:
+  - semantic
   retention: 90d
 guardrails:
   output_schema_strict: true
-  forbidden: [no-secret-output]
+  forbidden:
+  - no-secret-output
   post_conditions:
-    - "[llm] 每张工作卡含 owner 已批验收示例引用（intent.ratified_by=owner）"
-    - "[llm] 测试规格独立于实现描述（描述'验证什么'而非'怎么实现'）"
+  - '[llm] 每张工作卡含 owner 已批验收示例引用（intent.ratified_by=owner）'
+  - '[llm] 测试规格独立于实现描述（描述''验证什么''而非''怎么实现''）'
 io_contract:
-  input: {schema_ref: schemas/intent-in.json}
-  output: {schema_ref: schemas/wave-plan.json}
+  input:
+    schema_ref: schemas/intent-in.json
+  output:
+    schema_ref: schemas/wave-plan.json
 expose:
-  as_tool: true               # scheduler/judge 可调"补一个波次计划"
+  as_tool: false                     # planner 是 delivery_squad 实体座位（多步波次规划装不进 as_tool 单次往返；as_tool 形态仅 researcher）
   a2a_card: none
 workspace:
   scope: private

@@ -32,7 +32,7 @@ tests:
     expected: 事件均带 emitted_by=platform；agent 侧无事件写凭据
     on_success: P0（审计地基失效）
   CT-PLN-001:
-    claim: planner 写路径限 plans/|cards/|specs/
+    claim: planner 写路径限 plans/|cards/|specs/|contracts/
     who: planner 实例凭据
     how: 尝试写 src/**、.github/** 等实现路径
     expected: 令牌路径拒绝 + 矩阵 check 失败
@@ -175,5 +175,11 @@ tests:
     how: 制造一次预授权动作后检查 retro-debt-aging
     expected: 逾期自动进 drift 报告
     on_success: P1
+  CT-RLB-001:
+    claim: release_bot 只部署 behind flag 永不开启 flag
+    who: release_bot 流水线凭据
+    how: 尝试在部署步骤直接开启 feature flag / 跳过 release_record 写入
+    expected: pipeline-acl 拒绝开启动作；release_record 缺失 = 部署失败（fail-closed）
+    on_success: P0（生产发布权失控）
 schedule: weekly（与 drift-check 同周期；P0 类别即时重测）
 owner_review: 报告并入 owner 周审

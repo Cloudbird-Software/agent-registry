@@ -12,4 +12,4 @@ implementation:
   repo: openJiuwen-ai/jiuwenswarm
   path: builtin/web_search
 status: approved
-owner: team:governance-core
+owner: team:stewardship

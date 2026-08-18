@@ -23,8 +23,14 @@ model_list:
   # ── flagship-pool: reviewer ─────────────────────────────
   - model_name: reviewer
     litellm_params:
-      model: openai/<UPSTREAM_MODEL_C>     # TODO
+      model: openai/<UPSTREAM_MODEL_C>      # TODO
       api_key: os.environ/PROVIDER_KEY_A
+
+  # ── sovereign-pool: judge-deep（第三族——judge 族独立性，ADR-0011）──
+  - model_name: judge-deep
+    litellm_params:
+      model: openai/<UPSTREAM_MODEL_D>      # TODO 部署时换不同 provider 的强推理模型（异于 A/B/C 族）
+      api_key: os.environ/PROVIDER_KEY_D
 
   # ── embed-pool: embed-default ───────────────────────────
   - model_name: embed-default
@@ -44,7 +50,7 @@ router_settings:
 # 实现为 scheduler 的运行时行为：开卡时调 LiteTTM /key/generate 派生 per-card 虚拟 key
 # （max_budget/max_tokens 元数据，需启用 LiteLLM config DB），超限网关 429 fail-closed；
 # scheduler 收 circuit_broken 事件 → 回 planner 重规划。落地步骤见 README「预算熔断」节。
-# 同参重试 ≤1 次为 scheduler 侧限制，非网关职责。
+# 同参重试按卡 risk_class 上限（默认 1；high ≤2）为 scheduler 侧限制，非网关职责。
 
 litellm_settings:
   drop_params: true

@@ -1,45 +1,59 @@
 id: arbiter
-version: 2.0.0
-status: proposed          # 首个 team 引用时随 PR 提级
+version: 2.1.0
+status: approved                        # services.judge.members 绑定须 approved（AGENTS.md 引用规则）
 archetype: judge
 trust_zone: trusted_control
-role: "域内分歧仲裁：评审分歧/规格歧义/方法论选择；机械可判（flaky 重跑）不受理；输出=判决+理由+管辖依据，可被 owner 推翻"
+role: judge 服务成员（per_dispute：一次仲裁一实例，判后销毁；activation：僵持累计>=2 才激活，此前 escalation 直达
+  owner）：域内分歧仲裁；机械可判不受理；判例非规范
 identity:
   prompt_ref: identities/arbiter.md
 model:
-  alias: coder-deep           # family=flagship；须与争议双方(builder/test-author)异族——validate 族级强制
+  alias: judge-deep                     # family=sovereign ≠ builder(flash)/test-author(flagship)——族级独立性
   temperature: 0.1
   reasoning_level: high
 capabilities:
   skills: []
-  tools: [tool:read_file]     # 只读：争议材料 + evidence-pack artifact + 仓内固定 ref（无网络）
-  allow: [fs_read, vcs_read, datastore_read]
+  tools:
+  - tool:read_file
+  allow:
+  - fs_read
+  - vcs_read
+  - datastore_read
   agent_tools:
-    refs: []                  # 判决不借助任何 agent 输入，只读原始材料（profile: max=0）
+    refs: []
 isolation: hermetic
 approval: auto
 independence:
-  distinct_model_family_from: [builder, test-author]
+  distinct_model_family_from:
+  - builder
+  - test-author
 workflow:
-  mode: fixed                 # 受理→管辖核对→机械预筛(evidence-pack)→主张摘录→依据检索→判决（见 identity）
+  mode: fixed
 permissions:
   inherit: org-default
   overrides:
-    - {tools: [tool:read_file], pattern: "*", action: allow}
+  - tools:
+    - tool:read_file
+    pattern: '*'
+    action: allow
 memory:
-  types: [semantic]           # 判例索引（normative=false，仅检索辅助；≥3 同类 → policy_gap findings）
-  retention: 365d
+  types: []                             # 判例唯一入口=case_law/ artifact 只读——per_dispute 判后销毁，无跨实例私有判例记忆
+  retention: 0d
 guardrails:
-  output_schema_strict: true  # 判决 schema：{decision, rationale, jurisdiction_basis, reversible_by, claims_summary}
-  forbidden: [no-secret-output, no-bypass-gate]
+  output_schema_strict: true
+  forbidden:
+  - no-secret-output
+  - no-bypass-gate
   post_conditions:
-    - "[llm] 每份判决注明管辖依据（团队授权域条目），越域即改判'上升人类'"
-    - "[ci] 判决写入 decision_made 事件（含双方主张摘要）"
+  - '[llm] 每份判决注明管辖依据（团队授权域条目），越域即改判''上升人类'''
+  - '[platform] 判决以 decision_made 自述事件产出（平台事件通道；无 datastore 写凭据，CT-JDG-001）'
 io_contract:
-  input: {schema_ref: schemas/dispute-in.json}
-  output: {schema_ref: schemas/verdict.json}
+  input:
+    schema_ref: schemas/dispute-in.json
+  output:
+    schema_ref: schemas/verdict.json
 expose:
-  as_tool: false              # judge 不作为工具被调（防施压/背书）；仅 owner/scheduler 移交受理
+  as_tool: false
   a2a_card: none
 workspace:
   scope: private

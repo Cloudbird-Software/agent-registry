@@ -1,9 +1,10 @@
 id: red-adversary
-version: 1.0.0
+version: 2.0.0
 status: approved
 archetype: adversary
 trust_zone: trusted_control
-role: "治理层红队：逐条执行 control-tests.yaml（以目标原型真实凭据尝试越权，期望失败）；对新卡 premortem；findings 只进数据层"
+role: red_cell 服务成员（owner 直属 on-demand，不属任何团队）：执行 control-tests（期望越权失败）；premortem；findings
+  只进数据层（经 stewardship 审核入库——跨团队=可审）
 identity:
   prompt_ref: identities/red-adversary.md
 model:
@@ -12,10 +13,18 @@ model:
   reasoning_level: high
 capabilities:
   skills: []
-  tools: [tool:read_file, tool:bash]   # bash=一次性沙箱内执行控制测试（无网无生产凭据）
-  allow: [fs_read, fs_write_sandbox, vcs_read, shell_sandbox, datastore_read, datastore_write]
+  tools:
+  - tool:read_file
+  - tool:bash
+  allow:
+  - fs_read
+  - fs_write_sandbox
+  - vcs_read
+  - shell_sandbox
+  - datastore_read
+  - datastore_write
   agent_tools:
-    refs: []                            # profile: max=0
+    refs: []
 isolation: hermetic
 approval: auto
 workflow:
@@ -24,21 +33,29 @@ workflow:
 permissions:
   inherit: org-default
   overrides:
-    - {tools: [tool:bash], pattern: "re:.*(production|prod).*", action: deny}   # 永不触生产命名空间
+  - tools:
+    - tool:bash
+    pattern: re:.*(production|prod).*
+    action: deny
 memory:
-  types: [episodic]                     # 攻击史（不沉淀 semantic——防攻击模式被其他 agent 读到后针对性规避审计）
+  types:
+  - episodic
   retention: 365d
 guardrails:
   output_schema_strict: true
-  forbidden: [no-secret-output, no-bypass-gate]
+  forbidden:
+  - no-secret-output
+  - no-bypass-gate
   post_conditions:
-    - "[ci] findings 落数据层 findings/**（不直接开 PR/事件）"
-    - "[llm] 每条控制测试结果附期望 vs 实际"
+  - '[ci] findings 落数据层 findings/**（不直接开 PR/事件）'
+  - '[llm] 每条控制测试结果附期望 vs 实际'
 io_contract:
-  input: {schema_ref: schemas/ct-schedule-in.json}
-  output: {schema_ref: schemas/findings.json}
+  input:
+    schema_ref: schemas/ct-schedule-in.json
+  output:
+    schema_ref: schemas/findings.json
 expose:
-  as_tool: false                        # 红队不被任何 agent 调用（独立于被测对象）
+  as_tool: false
   a2a_card: none
 workspace:
   scope: private
