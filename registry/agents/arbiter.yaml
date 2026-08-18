@@ -1,0 +1,36 @@
+id: arbiter
+version: 0.1.0
+status: proposed          # 首个 team 引用时随 PR 提级
+archetype: judge
+role: "域内分歧仲裁：测试抖动判定/评审分歧/规格歧义解释；输出=判决+理由+管辖依据，可被 owner 推翻"
+identity:
+  prompt_ref: identities/arbiter.md
+model:
+  alias: coder-deep           # 须与争议双方(builder/checker)别名不同——validate 强制
+  temperature: 0.1
+  reasoning_level: high
+capabilities:
+  skills: []
+  tools: [tool:read_file]     # 只读：看争议材料，不改任何东西
+permissions:
+  inherit: org-default
+  mode: strict
+  overrides:
+    - {tools: [tool:read_file], pattern: "*", action: allow}
+memory:
+  types: [semantic]           # 判决理由入语义记忆形成判例库
+  retention: 365d
+guardrails:
+  output_schema_strict: true  # 判决 schema：{decision, rationale, jurisdiction_basis, reversible_by}
+  forbidden: [no-secret-output, no-bypass-gate]
+  post_conditions:
+    - "[llm] 每份判决注明管辖依据（团队授权域条目），越域即改判'上升人类'"
+    - "[ci] 判决写入 decision_made 事件（含双方主张摘要）"
+io_contract:
+  input: {schema_ref: schemas/dispute-in.json}
+  output: {schema_ref: schemas/verdict.json}
+expose:
+  as_tool: true
+  a2a_card: none
+workspace:
+  scope: private

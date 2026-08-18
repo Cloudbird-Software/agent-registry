@@ -1,0 +1,39 @@
+id: wave-planner
+version: 0.1.0
+status: proposed          # 首个 team 引用时随 PR 提级 approved（本轮为定义落盘，未经实战）
+archetype: planner
+role: "工作源头：意图→波次计划+工作卡+测试规格；只写计划产物，不写实现"
+identity:
+  prompt_ref: identities/wave-planner.md
+model:
+  alias: coder-deep           # 规划是重认知任务，用旗舰档
+  temperature: 0.3
+  reasoning_level: high
+capabilities:
+  skills: []                  # planning skill 待 teams 轮设计时随流程定义
+  tools: [tool:read_file, tool:write_file, tool:web_search]
+  # 检索增强（researcher-code）经 team 组装层以 as_tool 接入，不进本白名单（agent≠tool）
+permissions:
+  inherit: org-default
+  mode: normal
+  overrides:
+    # 仅允许写顶层 plans/|cards/|specs/（相对本 agent 工作区根）；其余显式 deny
+    # （normal 模式下 HIGH 仅 ask 不够；顶层锚定避免 src/plans/ 之类任意深度绕过）
+    - {tools: [tool:write_file], pattern: "re:^(?!(plans|cards|specs)/).*$", action: deny, severity: HIGH}
+memory:
+  types: [semantic]
+  retention: 90d
+guardrails:
+  output_schema_strict: true
+  forbidden: [no-secret-output]
+  post_conditions:
+    - "[llm] 每张工作卡含验收引用（[ci] 优先，指向 testing.yaml 条目或 golden）"
+    - "[llm] 测试规格独立于实现描述（描述'验证什么'而非'怎么实现'）"
+io_contract:
+  input: {schema_ref: schemas/intent-in.json}
+  output: {schema_ref: schemas/wave-plan.json}
+expose:
+  as_tool: true               # orchestrator/judge 可调"补一个波次计划"
+  a2a_card: none
+workspace:
+  scope: team
