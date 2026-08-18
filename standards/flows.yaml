@@ -84,3 +84,33 @@ maintain_loop:
     executor: stewardship 提请（curator）→ delivery_squad 以 backlog 为波次范围组建
     acceptance: pre_approved（复绿即验收——intent-routing maintain；security 级升 owner_ratify）
   metrics: [backlog_aging_p50/p95, deferred_count, maintenance_wave_count]   # metrics-aggregator 周报
+
+# ---- G. owner 控制（ADR-0013 PR-B：任务暂停/终止——控制动词=事件不是凭据）----
+owner_control:
+  entry: TUI 控制面板 / interface-gateway（observability.control_surface——同一入口）
+  scope: 卡级（波级冻结已有 wave.frozen——scheduler 预算熔断；owner 控制不重复波级）
+  verbs:
+    pause:
+      semantics: 停表停预算——wall_clock 不计暂停时间（诚实不惩罚的延伸：
+        owner 暂停思考不应烧掉卡的时间预算）；usd 已花照记（沉没成本是真实的）
+      target_states: [building, verify]   # 执行态才可暂停；drafting/ratified 本就未走表
+      event: "card.paused（producer: owner 经平台通道——observability 同模式）"
+      resume: 回原相位，走表恢复；暂停时长记入卡时间线（trace 可见）
+    abort:
+      semantics: 不可逆终止；reason 必填（落事件——无 reason 的 abort 不可接受：
+        组织的每个废动作都该有死因，否则 retro 无从归因）
+      target_states: 卡生命周期的任何非终态（终态=merged/archived/aborted）
+      reason_routing:                  # reason 决定善后，不是人决定
+        need_gone: 需求消失 → 卡 archived(作废)；无善后
+        spec_wrong: 规格错了 → 产 escape 类 finding 退 backlog（卡回炉——接 escape 回路：
+          规格错误是 planner 产卡质量问题，amendment_rate 归因）
+        superseded: 被更新意图取代 → 关联新卡 id 落事件，原卡 archived
+      event: "card.aborted（producer: owner 经平台通道）"
+  invariants:
+    - "控制动词是事件不是凭据：owner 经 TUI/interface-gateway 落 card.* 事件，
+      平台执行——TUI 无数据层写凭据（observability.read_only）"
+    - "注意力账本不新增阻塞点：账本管『系统等 owner』；owner 主动出手（pause/abort）
+      不入账本——反向的『owner 等系统响应』由 feedback_loop 保证（视图即时反映）"
+    - "abort 后预算对账：已耗 usd 记账不退（沉没成本入 metrics——abort_rate 高是
+      intent 质量信号，归因 interface-gateway 路由准确率而非 builder）"
+  metrics: [pause_count, pause_duration_p95, abort_rate(by reason_routing)]
