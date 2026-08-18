@@ -517,6 +517,29 @@ for cc in ("trivial", "spike"):
     if cc in CHANGE_CLASSES and cc not in _intent_classes:
         fail(f"change-class '{cc}' 已定义但无 intent 路由到它（孤类——路由表不完整）")
 
+# ---- CT ↔ scenario 双向链接校验（ADR-0015：测试底层方法统一）----
+# control-tests 每条：scenario=声明层先决场景（必须存在于 scenarios.yaml，可 null）；
+# runtime ∈ {adversary-executed, validate-executed, manual_only}（manual_only 须带注释理由）。
+# 反向：scenarios.yaml 的 ct_refs 引用必须存在于 control-tests.yaml（悬空引用=漂移）。
+SCEN = (load_yaml(ROOT / "standards" / "scenarios.yaml") or {}).get("scenarios") or {}
+CT_TESTS = (load_yaml(ROOT / "standards" / "control-tests.yaml") or {}).get("tests") or {}
+_valid_rt = {"adversary-executed", "validate-executed", "manual_only"}
+for cid, ct in CT_TESTS.items():
+    if not isinstance(ct, dict):
+        continue
+    scen = ct.get("scenario")
+    if scen is not None and scen not in SCEN:
+        fail(f"{cid} scenario '{scen}' 不在 scenarios.yaml（悬空场景引用）")
+    rt = str(ct.get("runtime", ""))
+    if rt not in _valid_rt:
+        fail(f"{cid} runtime '{rt}' 非法（∈ {sorted(_valid_rt)}）")
+    if rt == "manual_only" and not ct.get("runtime_note"):
+        fail(f"{cid} runtime=manual_only 无 runtime_note（ADR-0015：显式 manual_only 必须带理由）")
+for sid, spec in SCEN.items():
+    for ref in (spec.get("ct_refs") or []):
+        if ref not in CT_TESTS:
+            fail(f"scenario {sid} ct_refs 引用不存在的 {ref}（悬空 CT 引用）")
+
 if errors:
     print(f"FAIL ({len(errors)}):")
     for e in errors:
