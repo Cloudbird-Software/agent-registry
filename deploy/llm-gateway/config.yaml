@@ -1,0 +1,47 @@
+# LLM Gateway 配置（LiteLLM proxy）
+# ADR-0002 rev1：与 registry/models.yaml 同仓；validate.py 强制别名对齐。
+# 规则：model_name = 对外别名（与 models.yaml alias 完全一致）；
+#       同一 model_name 写多条 = 路由组（自动 failover / 用量轮转）。
+model_list:
+  # ── flash-pool: coder-fast ──────────────────────────────
+  - model_name: coder-fast
+    litellm_params:
+      model: openai/<UPSTREAM_MODEL_A>     # TODO 部署时替换为真实 provider/模型名
+      api_key: os.environ/PROVIDER_KEY_A
+  # 加第二节点即自动组成 failover 组（注释示例）：
+  # - model_name: coder-fast
+  #   litellm_params:
+  #     model: deepseek/deepseek-chat
+  #     api_key: os.environ/PROVIDER_KEY_B
+
+  # ── flagship-pool: coder-deep ───────────────────────────
+  - model_name: coder-deep
+    litellm_params:
+      model: openai/<UPSTREAM_MODEL_B>     # TODO
+      api_key: os.environ/PROVIDER_KEY_A
+
+  # ── flagship-pool: reviewer ─────────────────────────────
+  - model_name: reviewer
+    litellm_params:
+      model: openai/<UPSTREAM_MODEL_C>     # TODO
+      api_key: os.environ/PROVIDER_KEY_A
+
+  # ── embed-pool: embed-default ───────────────────────────
+  - model_name: embed-default
+    litellm_params:
+      model: openai/<EMBED_MODEL>          # TODO
+      api_key: os.environ/PROVIDER_KEY_A
+
+router_settings:
+  routing_strategy: usage-based-routing-v2   # 按用量路由：单节点配额尽/失败自动切组内下一节点
+  num_retries: 2
+  timeout: 600
+  allowed_fails: 3                           # 连续失败 3 次拉黑该节点
+  cooldown_time: 60                          # 拉黑 60s
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 600
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY  # 管理面 key（生成 per-team key 用）；绝不发给 agent
