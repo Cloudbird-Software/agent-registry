@@ -46,6 +46,14 @@ skills = {p.parent.name: frontmatter(p) for p in (REG / "skills").glob("*/SKILL.
 models = (load_yaml(REG / "models.yaml") or {}).get("models", [])
 model_aliases = {m.get("alias") for m in models}
 
+# ---- gateway 配置对齐（ADR-0002 rev1）：别名集合与 models.yaml 完全一致 ----
+GW_CFG = ROOT / "deploy" / "llm-gateway" / "config.yaml"
+if GW_CFG.exists():
+    gwc = load_yaml(GW_CFG) or {}
+    gw_aliases = {m.get("model_name") for m in gwc.get("model_list", []) or []}
+    if gw_aliases != model_aliases:
+        fail(f"deploy/llm-gateway/config.yaml 的别名 {sorted(gw_aliases)} 与 models.yaml {sorted(model_aliases)} 不一致（ADR-0002 rev1）")
+
 OK = {"approved", "deprecated"}  # deprecated 仍可被既有声明引用，但新引用报警
 ACTIVE = {"approved", "active"}
 
