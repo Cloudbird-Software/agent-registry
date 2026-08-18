@@ -50,7 +50,16 @@ OK = {"approved", "deprecated"}  # deprecated 仍可被既有声明引用，但�
 ACTIVE = {"approved", "active"}
 
 # ---- agent 校验 ----
+ARCHETYPES = {"builder", "checker", "orchestrator", "curator", "interface", "observer", "operator"}
 for aid, a in agents.items():
+    arch = a.get("archetype")
+    if arch not in ARCHETYPES:
+        fail(f"agent:{aid} archetype 非法或缺失: {arch}（AR-8）")
+    if arch == "checker":
+        if a.get("workspace", {}).get("scope") != "private":
+            fail(f"agent:{aid} 是 checker 但 workspace.scope != private（AR-8 利益分离）")
+        if a.get("permissions", {}).get("mode") != "strict":
+            fail(f"agent:{aid} 是 checker 但 permissions.mode != strict（AR-8）")
     for ref in a.get("capabilities", {}).get("skills", []) or []:
         sid = ref.removeprefix("skill:")
         if sid not in skills:
@@ -78,12 +87,42 @@ for sid, s in skills.items():
 
 # ---- team 校验 ----
 for tid, t in teams.items():
+    member_ids = []
     for m in t.get("members", []):
         aid = re.sub(r"^registry:", "", m.get("agent", "")).removeprefix("agent:").split("@")[0]
+        member_ids.append(aid)
         if aid not in agents:
             fail(f"team:{tid} 引用不存在的 agent:{aid}")
         elif agents[aid].get("status") not in OK:
             fail(f"team:{tid} 引用未批准的 agent:{aid}")
+    # AR-9 验证链：含 builder 的团队必须独立 checker 验收 + 外部审计
+    builders = [a for a in member_ids if agents.get(a, {}).get("archetype") == "builder"]
+    ver = t.get("verification", {})
+    if builders:
+        checkers = [(c.removeprefix("agent:").split("@")[0]) for c in ver.get("in_team_check", {}).get("checkers", []) or []]
+        if not checkers:
+            fail(f"team:{tid} 含 builder 成员但未声明 verification.in_team_check.checkers（AR-9）")
+        for c in checkers:
+            if c not in agents:
+                fail(f"team:{tid} 的 checker 引用不存在的 agent:{c}")
+                continue
+            if agents[c].get("archetype") != "checker":
+                fail(f"team:{tid} 的验收者 agent:{c} 不是 checker 原型（AR-8/9）")
+            if c in builders:
+                fail(f"team:{tid} 中 agent:{c} 既是 builder 又是验收者（利益分离）")
+            ca = agents[c].get("model", {}).get("alias")
+            for b in builders:
+                ba = agents[b].get("model", {}).get("alias")
+                if ca and ba and ca == ba:
+                    fail(f"team:{tid} 验收者 {c} 与 builder {b} 使用相同模型别名 {ca}（独立性不足）")
+        ea = ver.get("external_audit", {})
+        if t.get("lifecycle", {}).get("type") == "ephemeral" and not ea.get("team"):
+            fail(f"team:{tid} 是 ephemeral 产出型团队但未声明 external_audit（AR-9）")
+        eat = (ea.get("team") or "").removeprefix("team:")
+        if eat and eat.startswith("null:"):
+            pass  # owner 直审（仅 persistent 治理团队允许）
+        elif eat and (eat not in teams or teams[eat].get("lifecycle", {}).get("type") != "persistent"):
+            fail(f"team:{tid} 的 external_audit.team 不是 persistent 团队: {eat}")
     life = t.get("lifecycle", {})
     if life.get("type") == "ephemeral":
         target = (life.get("archive_to") or "").removeprefix("team:")

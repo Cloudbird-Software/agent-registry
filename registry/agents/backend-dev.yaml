@@ -1,6 +1,7 @@
 id: backend-dev
-version: 1.0.0
+version: 1.1.0
 status: approved
+archetype: builder
 role: "Go/TS 后端开发：模块实现 + 测试 + PR 提交"
 identity:
   prompt_ref: identities/backend-dev.md
@@ -23,6 +24,13 @@ credential:
 memory:
   types: [episodic]
   retention: 30d
+guardrails:
+  output_schema_strict: true
+  must_run: ["make check"]
+  forbidden: [no-self-test, no-force-push, no-secret-output, no-bypass-gate]
+  post_conditions:
+    - "[ci] PR gate 全绿"
+    - "[llm] 提交说明与任务目标对应"
 io_contract:
   input: {schema_ref: schemas/task-in.json}
   output: {schema_ref: schemas/pr-out.json}
