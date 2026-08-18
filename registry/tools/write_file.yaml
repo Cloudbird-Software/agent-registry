@@ -1,0 +1,10 @@
+id: write_file
+version: 1.0.0
+kind: builtin
+severity: MEDIUM
+side_effects: [filesystem_write]
+input: {schema_ref: schemas/write-in.json}
+output: {schema_ref: schemas/write-out.json}
+implementation: {repo: openJiuwen/jiuwenswarm, path: builtin/write_file}
+status: approved
+owner: team:governance-core

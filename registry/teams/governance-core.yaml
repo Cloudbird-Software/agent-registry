@@ -1,0 +1,23 @@
+id: governance-core
+version: 1.0.0
+status: active
+goal: "常设治理团队：持有 .github 治理仓与 agent-registry 的审批权；接收并审核 ephemeral 团队的归档资产；运行漂移检测与周报"
+members:
+  - {agent: agent:reviewer, count: 1, as_tool: false}
+topology: leader-teammate
+orchestration:
+  assign: leader-dispatch
+  merge: leader-aggregate
+  workflow_ref: workflows/governance-core.flow.yaml
+workspace:
+  shared:
+    root: env:GOVERNANCE_WORKSPACE_ROOT
+    version_control: true
+  layout: {inbox: inbox/, artifacts: artifacts/, decisions: decisions/}
+storage:
+  type: postgresql
+  ref: env:TEAM_DB_DSN
+lifecycle:
+  type: persistent               # 持续存在；对治理资产持续负责（AR-6）
+  destroy_policy: manual
+channels: [web, tui]

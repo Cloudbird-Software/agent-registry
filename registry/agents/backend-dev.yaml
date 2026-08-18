@@ -1,0 +1,33 @@
+id: backend-dev
+version: 1.0.0
+status: approved
+role: "Go/TS 后端开发：模块实现 + 测试 + PR 提交"
+identity:
+  prompt_ref: identities/backend-dev.md
+model:
+  alias: coder-fast
+  temperature: 0.2
+  reasoning_level: low
+capabilities:
+  skills: [skill:tdd-loop, skill:code-review-fix]
+  tools: [tool:bash, tool:read_file, tool:write_file, tool:gitcode-pr]
+permissions:
+  inherit: org-default
+  mode: normal
+  overrides:
+    - {tools: [tool:bash], pattern: "git push *", severity: HIGH}
+    - {tools: [tool:bash], pattern: "re:.*rm -rf.*", action: deny}
+credential:
+  github_app: cloudbird-agent
+  secrets: [GITCODE_TOKEN]
+memory:
+  types: [episodic]
+  retention: 30d
+io_contract:
+  input: {schema_ref: schemas/task-in.json}
+  output: {schema_ref: schemas/pr-out.json}
+expose:
+  as_tool: true
+  a2a_card: none
+workspace:
+  scope: team

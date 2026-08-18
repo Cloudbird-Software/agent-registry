@@ -1,0 +1,29 @@
+id: reviewer
+version: 1.0.0
+status: approved
+role: "代码评审与治理审计：PR 审查、政策符合性检查"
+identity:
+  prompt_ref: identities/reviewer.md
+model:
+  alias: reviewer
+  temperature: 0.1
+  reasoning_level: medium
+capabilities:
+  skills: [skill:code-review-fix]
+  tools: [tool:read_file, tool:bash]
+permissions:
+  inherit: org-default
+  mode: strict                       # 治理审计角色用 strict：MEDIUM 即 ask
+  overrides:
+    - {tools: [tool:bash], pattern: "re:.*(push|commit).*", action: deny}   # 评审者只读仓库
+credential:
+  github_app: cloudbird-agent
+  secrets: []
+memory:
+  types: [semantic, episodic]
+  retention: 90d
+expose:
+  as_tool: true
+  a2a_card: auto
+workspace:
+  scope: private

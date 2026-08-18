@@ -1,0 +1,26 @@
+id: dev-wave
+version: 1.0.0
+status: approved
+goal: "按波次交付服务模块：实现+测试+PR，单波单仓"
+members:
+  - {agent: agent:backend-dev, count: 2, as_tool: false}
+  - {agent: agent:reviewer, count: 1, as_tool: true}     # 评审者作为工具被 leader 调用
+topology: leader-teammate
+orchestration:
+  assign: leader-dispatch
+  merge: leader-aggregate
+  workflow_ref: workflows/dev-wave.flow.yaml
+workspace:
+  shared:
+    root: env:TEAM_WORKSPACE_ROOT         # 分布式部署 = 各节点同一 NFS 路径
+    version_control: true
+  layout: {inbox: inbox/, artifacts: artifacts/, decisions: decisions/}
+storage:
+  type: postgresql
+  ref: env:TEAM_DB_DSN
+lifecycle:
+  type: ephemeral                        # 任务制：波次完成即归档
+  archive_to: team:governance-core       # 资产沉淀目标（持久团队）
+  handoff: [artifacts-pr, memory-distill, adr-write, trace-archive, retrospective]
+  destroy_policy: after-handoff          # handoff 全部完成才允许销毁（AR-6）
+channels: [web]

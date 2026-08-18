@@ -1,0 +1,12 @@
+id: bash
+version: 1.0.0
+kind: shell
+severity: HIGH
+side_effects: [shell_exec, filesystem_write, network]
+input: {schema_ref: schemas/bash-in.json}
+output: {schema_ref: schemas/bash-out.json}
+implementation:
+  repo: openJiuwen/jiuwenswarm           # 编排框架内置
+  path: builtin/bash
+status: approved
+owner: team:governance-core

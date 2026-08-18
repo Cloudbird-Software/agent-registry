@@ -1,0 +1,36 @@
+# 模型注册表（single source of truth）
+# 规则（GOVERNANCE AR-3）：
+#   1. agent 声明只引用 alias；alias → 实际 provider/节点的解析只发生在 LLM Gateway 侧
+#   2. 一切 key 只存 gateway 的 secret store（部署时注入 env），任何仓库/声明/agent 配置不得出现明文
+#   3. 用量按 per-team/per-agent 的 gateway key 计量；路由策略（failover/配额）为网关部署配置，落 openjiuwen 仓
+version: 1
+gateway:
+  endpoint: env:LLM_GATEWAY_ENDPOINT      # 如 http://llm-gateway.internal:4000
+  auth: env:LLM_GATEWAY_KEY
+  deployment_ref: "Cloudbird-Software/openjiuwen deploy/llm-gateway"  # 部署与路由配置版本化位置
+  strategies: [failover, quota-routing]   # 节点用量耗尽/不可达 → 自动切路由组内下一节点
+models:
+  - alias: coder-fast
+    route_group: flash-pool               # gateway 侧一组等价节点，自动 failover
+    limits: {temperature_max: 0.6}
+    cost_tier: low
+    quota_tier: standard                  # 对应 gateway per-key 配额档
+    use_for: [code-gen, routine-tasks]
+  - alias: coder-deep
+    route_group: flagship-pool
+    limits: {temperature_max: 0.4}
+    cost_tier: high
+    quota_tier: restricted
+    use_for: [architecture, hard-debug]
+  - alias: reviewer
+    route_group: flagship-pool
+    limits: {temperature_max: 0.2}
+    cost_tier: high
+    quota_tier: standard
+    use_for: [code-review, governance-audit]
+  - alias: embed-default
+    route_group: embed-pool
+    limits: {}
+    cost_tier: low
+    quota_tier: standard
+    use_for: [memory-retrieval]
