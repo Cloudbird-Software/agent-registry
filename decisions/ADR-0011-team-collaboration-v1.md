@@ -70,5 +70,6 @@ ADR-0010 建立了九原型+六机制与验证链，但"多 agent 如何组队�
 - 每个角色四命题（有用/能启动/能交付/能信任）有机器可复验的载体（validate+simulate 12 场景）。
 - 代价：改 team-collaboration 相位图/权限/授权矩阵需同步过 12 场景——这是有意的（流程声明的
   变更成本应与其影响半径成正比）。
-- 遗留（下次迭代）：team.schema（L0）需增 destroy_condition 字段与 re-check-sample 枚举值
-  （实例侧已按语义对齐，schema 枚举滞后——跨仓 PR）；check:* CI 名的注册表化。
+- 遗留处置（ADR-0012）：team.schema（L0）已升 v2——增 destroy_condition 字段与 re-check-sample
+  枚举值并对齐三实例全部语义（.github#16；jsonschema 实测 v1 13 处不符→v2 全 PASS）；
+  check:* 注册表化落地 standards/checks.yaml + validate fail-closed 校验（悬空防线不可声明）。
