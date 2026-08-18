@@ -1,0 +1,41 @@
+version: 1
+# ============================================================================
+# Change Classes —— 产品仓变更分级（ADR-0010 第五节采纳）
+# 原则：仪式感与影响半径成正比（anti-ritual-creep——否则治理会被 owner 自己绕过）。
+# 与治理仓 C1/C2/C3（GM-2，治理域）正交：本表管产品仓怎么改代码，那套管治理资产怎么改。
+# ============================================================================
+classes:
+  doc:
+    scope: 注释/README/文档措辞
+    card: optional
+    gate: [lint]
+    review: none
+    merge: integrator auto
+  logic:
+    scope: 业务代码/测试
+    card: required
+    gate: [unit, acceptance, hidden(二期), "mutation>=T"]
+    review: verifier（机制判决）
+    merge: integrator auto（required checks 全绿 + verifier verdict + 卡号 metadata）
+  dep:
+    scope: 依赖新增/升级
+    card: required
+    gate: [unit, acceptance, sca, license-check, hash-pin]
+    review: owner_ratify          # 幻觉依赖/抢注是一人公司真实高频风险
+    merge: integrator auto（owner 批后）
+  schema:
+    scope: 数据库 schema/接口契约
+    card: required
+    gate: [unit, acceptance, migration-dry-run, backup-verified]
+    review: owner_ratify
+    reversibility: required       # 必须附可执行回滚
+    merge: integrator auto（owner 批后）
+  prod:
+    scope: 生产环境变更
+    card: required
+    gate: [smoke, canary]
+    review: owner_per_action      # RL-1
+    merge: deployer 执行（非 git 合并语义）
+expedited:
+  rule: 允许降级走快速道，但必须 N<=3 天内补 retro-ADR；curator 追踪为带期限的债（与 incident retro 债同机制）
+  audit: 破玻璃直推仍被 drift-check §8 曝光，24h 回填不变

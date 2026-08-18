@@ -1,0 +1,11 @@
+# CODEOWNERS（ADR-0010 批次4：治理之治理 owner-only）
+# ruleset 开启 require code-owner review → 以下路径的 PR 必须由 owner(randypanding) 批准，
+# curator 也无法自批（CT-CUR-002 的平台防线）。
+# 默认：本仓一切变更 owner 知情
+*                               @randypanding
+# 治理之治理：标准/校验器/词表/控制测试/CODEOWNERS 自身——owner-only 硬路径
+/standards/**                   @randypanding
+/scripts/validate.py            @randypanding
+/CODEOWNERS                     @randypanding
+/.github/**                     @randypanding
+/decisions/**                   @randypanding

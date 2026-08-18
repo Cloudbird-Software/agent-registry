@@ -10,11 +10,32 @@ jobs:
   gate:  # check 名 = job id；ruleset required check = gate
     runs-on: ubuntu-latest
     steps:
+      # ── 自指门禁修复（ADR-0010 批次4）────────────────────────────
+      # PR 事件：校验器与标准（profiles/词表/CT 登记）从 base ref 取，
+      # registry 数据从 PR head 取——同一 PR 内削弱 validate.py/profiles
+      # 后"用被削弱的门禁审自己"的路径被关闭。
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.base_ref }}      # 标准侧 = base
+          path: std
+          persist-credentials: false
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        if: github.event_name == 'pull_request'
+        with:                               # 数据侧 = PR merge ref（默认）
+          path: data
+          persist-credentials: false
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        if: github.event_name != 'pull_request'
         with:
           persist-credentials: false
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: "3.12"
       - run: pip install pyyaml
-      - run: python3 scripts/validate.py
+      - name: validate（标准=base，数据=head）
+        if: github.event_name == 'pull_request'
+        run: REGISTRY_DATA_ROOT="$GITHUB_WORKSPACE/data" python3 std/scripts/validate.py
+      - name: validate（main）
+        if: github.event_name != 'pull_request'
+        run: python3 scripts/validate.py
