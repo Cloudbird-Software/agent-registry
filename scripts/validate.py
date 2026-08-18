@@ -58,7 +58,7 @@ OK = {"approved", "deprecated"}  # deprecated 仍可被既有声明引用，但�
 ACTIVE = {"approved", "active"}
 
 # ---- agent 校验 ----
-ARCHETYPES = {"builder", "checker", "orchestrator", "curator", "interface", "observer", "operator"}
+ARCHETYPES = {"builder", "planner", "checker", "judge", "orchestrator", "curator", "interface", "observer", "researcher", "operator"}
 for aid, a in agents.items():
     arch = a.get("archetype")
     if arch not in ARCHETYPES:
@@ -103,6 +103,15 @@ for tid, t in teams.items():
             fail(f"team:{tid} 引用不存在的 agent:{aid}")
         elif agents[aid].get("status") not in OK:
             fail(f"team:{tid} 引用未批准的 agent:{aid}")
+    # AR-8 v2：judge 独立性——仲裁者模型别名不得与争议双方（builder/checker 成员）相同
+    judges = [a for a in member_ids if agents.get(a, {}).get("archetype") == "judge"]
+    disputants = [a for a in member_ids if agents.get(a, {}).get("archetype") in ("builder", "checker")]
+    for j in judges:
+        ja = agents[j].get("model", {}).get("alias")
+        for d in disputants:
+            da = agents[d].get("model", {}).get("alias")
+            if ja and da and ja == da:
+                fail(f"team:{tid} 仲裁者 {j} 与争议方 {d} 模型别名相同({ja})，裁决不独立（ADR-0008）")
     # AR-9 验证链：含 builder 的团队必须独立 checker 验收 + 外部审计
     builders = [a for a in member_ids if agents.get(a, {}).get("archetype") == "builder"]
     ver = t.get("verification", {})
