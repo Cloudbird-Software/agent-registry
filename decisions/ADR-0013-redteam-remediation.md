@@ -47,7 +47,12 @@
    - 本仓 validate.yml：PR 触及 C1 路径（standards/|scripts/|decisions/|.github/|CODEOWNERS|tests/）
      时，PR body/title 必须含 `ADR-\d{4}`（词边界匹配，防子串伪造），且被引 ADR 文件须存在于
      PR head 的 decisions/；PR 文件清单分页读取（--paginate，防 >100 文件漏检）。
-   - .github gate.yml：同规则（C1 路径为该仓布局）。
+   - .github gate.yml：同规则（C1 路径为该仓布局）；PR 文件清单 --paginate、
+     正则词边界（防 NOTADR-0013junk 子串绕过）。被引 ADR 的**存在性**校验不在
+     PR 上下文做——agent-registry 为私有仓，PR 上下文 GITHUB_TOKEN 无跨仓读权，
+     注入 org secret 则向 PR 控制的代码暴露凭据（zizmor secret-exposure 模型）；
+     存在性由 .github drift-check.sh §10 后验（每日、可信 main 上下文、独立 7 天
+     窗口）：窗口内合并 PR 的 ADR 引用须真实存在于 agent-registry/decisions/。
    - checks.yaml 中 adr-required 由 planned → active；ADR-0012 的实装待办清零。
 
 4. **ADR 编号唯一性机器检查**：
