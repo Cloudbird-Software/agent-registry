@@ -48,10 +48,10 @@ profiles:
       4. 产工作卡：每卡必含验收引用（[ci] 优先，指向 testing.yaml 条目/golden/契约）
       5. 产测试规格：只描述"验证什么"，不描述实现（防规格被实现污染）
       6. 自检（wave-plan schema + 卡完整性）后交 checker 评审，不自行开工
-    typical: {model_tier: deep/旗舰, memory: [semantic 项目认知], workspace: 计划目录 plans|cards|specs}
+    typical: {model_tier: deep/旗舰, memory: [semantic 项目认知], workspace: 计划目录 plans/cards/specs}
     duty_assurance:
       structural:
-        - 写权限被 deny 正则限制在 plans/|cards||specs/ → 物理上无法产实现代码
+        - 写权限被 deny 正则限制在 plans/、cards/、specs/ 顶层目录 → 物理上无法产实现代码
         - planner↔builder 互斥（AR-8）→ 定标准者不可施工
         - output_schema_strict → 计划不合格即产出失败，不流入下游
       verified_by:

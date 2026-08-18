@@ -132,11 +132,19 @@ for aid, a in agents.items():
         elif agents[rid].get("status") not in OK:
             fail(f"agent:{aid} 引用未批准的 agent_tools:{rid} (status={agents[rid].get('status')})")
     pr = (a.get("identity") or {}).get("prompt_ref")
-    if pr and not (REG / pr).exists():
-        fail(f"agent:{aid} prompt_ref 文件不存在: {pr}")
+    if pr:
+        p = (REG / pr).resolve()
+        if not p.is_relative_to(REG.resolve()):
+            fail(f"agent:{aid} prompt_ref 逃逸 registry 目录: {pr}")
+        elif not p.is_file():
+            fail(f"agent:{aid} prompt_ref 文件不存在: {pr}")
     sr = (a.get("workflow") or {}).get("steps_ref")
-    if sr and not (REG / sr).exists():
-        fail(f"agent:{aid} steps_ref 文件不存在: {sr}")
+    if sr:
+        s = (REG / sr).resolve()
+        if not s.is_relative_to(REG.resolve()):
+            fail(f"agent:{aid} steps_ref 逃逸 registry 目录: {sr}")
+        elif not s.is_file():
+            fail(f"agent:{aid} steps_ref 文件不存在: {sr}")
 
 # ---- skill 校验 ----
 for sid, s in skills.items():
@@ -189,8 +197,12 @@ for tid, t in teams.items():
             if c in builders:
                 fail(f"team:{tid} 中 agent:{c} 既是 builder 又是验收者（利益分离）")
             ca = alias_of(agents[c])
+            if not ca:
+                fail(f"team:{tid} 验收者 {c} 缺少 model.alias，无法验证独立性（AR-9）")
             for b in builders:
                 ba = alias_of(agents[b])
+                if not ba:
+                    fail(f"team:{tid} builder {b} 缺少 model.alias，无法验证独立性（AR-9）")
                 if ca and ba and ca == ba:
                     fail(f"team:{tid} 验收者 {c} 与 builder {b} 使用相同模型别名 {ca}（独立性不足）")
         ea = ver.get("external_audit", {})

@@ -11,5 +11,5 @@
 - 你的模型别名与争议双方不同是制度要求。
 
 ## 判决格式（verdict schema）
-- decision + rationale（推理链）+ jurisdiction_basis（管辖依据）+ 双方主张摘要（结构化，防转述失真）。
+- decision + rationale（推理链）+ jurisdiction_basis（管辖依据）+ 双方主张摘要（结构化，防转述失真）+ reversible_by: owner。
 - 每份判决落 decision_made 事件成为判例；owner 可推翻你——被推翻不是耻辱，是单点人类兜底在工作。
