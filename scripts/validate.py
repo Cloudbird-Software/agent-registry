@@ -385,6 +385,32 @@ for tid, t in tools.items():
         if ot not in teams or teams[ot].get("lifecycle", {}).get("type") != "persistent":
             fail(f"tool:{tid} 的 owner 不是 persistent 团队: {owner}")
 
+# ---- check:* 注册表校验（ADR-0012：悬空防线不可声明）----
+# standards/ 与 registry/ 中一切 check:<id> 引用必须 ∈ standards/checks.yaml（fail-closed）。
+# 文本级扫描：引用嵌在自由文本（description/enforced_by/post_conditions）里，结构遍历会漏。
+CHECKS_REG = load_yaml(ROOT / "standards" / "checks.yaml") or {}
+CHECKS = {c.get("id") for c in CHECKS_REG.get("checks", []) if isinstance(c, dict)}
+if not CHECKS:
+    fail("standards/checks.yaml 注册表为空或缺失（ADR-0012）")
+check_re = re.compile(r"check:([a-z][a-z0-9-]*)")
+for scope_root in (ROOT / "standards", REG):
+    for p in scope_root.rglob("*.yaml"):
+        for m in check_re.finditer(p.read_text(encoding="utf-8")):
+            if m.group(1) not in CHECKS:
+                fail(f"{p.relative_to(ROOT)} 引用未注册的 check:{m.group(1)}"
+                     f"（不在 standards/checks.yaml——悬空防线）")
+# 反向：登记但无任何声明引用 = 注册表漂移（与 ct-coverage 反向同模式；
+# consumed_externally 的条目消费方在平台仓，跳过）
+_scanned = set()
+for scope_root in (ROOT / "standards", REG):
+    for p in scope_root.rglob("*.yaml"):
+        if p.name == "checks.yaml":
+            continue
+        _scanned.update(check_re.findall(p.read_text(encoding="utf-8")))
+_ext = {c.get("id") for c in CHECKS_REG.get("checks", []) if c.get("consumed_externally")}
+for cid in sorted(CHECKS - _scanned - _ext):
+    fail(f"checks.yaml 登记 {cid} 未被任何声明引用（注册表漂移——登记项须有消费方）")
+
 if errors:
     print(f"FAIL ({len(errors)}):")
     for e in errors:

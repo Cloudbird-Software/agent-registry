@@ -31,7 +31,7 @@ guardrails:
   must_run: ["python3 scripts/validate.py"]
   forbidden: [no-secret-output, no-bypass-gate]
   post_conditions:
-    - "[ci] C1 变更必附 ADR（adr-required check）"
+    - "[ci] C1 变更必附 ADR（check:adr-required）"
     - "[llm] 归档审核结论附资产引用与不合格理由"
 io_contract:
   input: {schema_ref: schemas/handoff-in.json}

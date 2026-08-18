@@ -18,6 +18,7 @@
 | 理解团队/协作/卡与流/生效机制 | [standards/team-collaboration.yaml](standards/team-collaboration.yaml)（ADR-0011） |
 | owner 注意力如何被预算 | [standards/attention-ledger.yaml](standards/attention-ledger.yaml) |
 | 写某个 agent 的提示词 | registry/identities/ 既有范本 |
+| 声明中引用 check:* 防线 | [standards/checks.yaml](standards/checks.yaml)（未登记=validate 拒绝，ADR-0012） |
 | io_contract 输入/输出 schema | registry/schemas/*.json |
 | 选模型 / 查配额档 | [registry/models.yaml](registry/models.yaml) |
 | 理解某条现状的为什么 | [decisions/](decisions/) 的 ADR |
