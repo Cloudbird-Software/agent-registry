@@ -16,6 +16,11 @@ def fail(msg: str) -> None:
     errors.append(msg)
 
 
+def alias_of(a: dict):
+    """读取 agent 的 model.alias；model 为 null/缺失 时返回 None（不抛异常）"""
+    return (a.get("model") or {}).get("alias")
+
+
 def load_yaml(path: Path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -80,7 +85,7 @@ for aid, a in agents.items():
             fail(f"agent:{aid} 引用不存在的 tool:{tid}")
         elif tools[tid].get("status") not in OK:
             fail(f"agent:{aid} 引用未批准的 tool:{tid} (status={tools[tid].get('status')})")
-    alias = a.get("model", {}).get("alias")
+    alias = alias_of(a)
     if alias and alias not in model_aliases:
         fail(f"agent:{aid} 引用未注册的模型 alias: {alias}")
 
@@ -107,16 +112,16 @@ for tid, t in teams.items():
     judges = [a for a in member_ids if agents.get(a, {}).get("archetype") == "judge"]
     disputants = [a for a in member_ids if agents.get(a, {}).get("archetype") in ("builder", "checker")]
     for j in judges:
-        ja = agents[j].get("model", {}).get("alias")
+        ja = alias_of(agents[j])
         if not ja:
             fail(f"team:{tid} 仲裁者 {j} 缺少 model.alias，无法验证裁决独立性（ADR-0008）")
     for d in disputants:
-        if not agents[d].get("model", {}).get("alias"):
+        if not alias_of(agents[d]):
             fail(f"team:{tid} 争议方 {d} 缺少 model.alias，无法验证裁决独立性（ADR-0008）")
     for j in judges:
-        ja = agents[j].get("model", {}).get("alias")
+        ja = alias_of(agents[j])
         for d in disputants:
-            da = agents[d].get("model", {}).get("alias")
+            da = alias_of(agents[d])
             if ja and da and ja == da:
                 fail(f"team:{tid} 仲裁者 {j} 与争议方 {d} 模型别名相同({ja})，裁决不独立（ADR-0008）")
     # AR-9 验证链：含 builder 的团队必须独立 checker 验收 + 外部审计
@@ -134,9 +139,9 @@ for tid, t in teams.items():
                 fail(f"team:{tid} 的验收者 agent:{c} 不是 checker 原型（AR-8/9）")
             if c in builders:
                 fail(f"team:{tid} 中 agent:{c} 既是 builder 又是验收者（利益分离）")
-            ca = agents[c].get("model", {}).get("alias")
+            ca = alias_of(agents[c])
             for b in builders:
-                ba = agents[b].get("model", {}).get("alias")
+                ba = alias_of(agents[b])
                 if ca and ba and ca == ba:
                     fail(f"team:{tid} 验收者 {c} 与 builder {b} 使用相同模型别名 {ca}（独立性不足）")
         ea = ver.get("external_audit", {})
