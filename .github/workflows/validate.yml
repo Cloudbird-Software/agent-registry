@@ -1,4 +1,4 @@
-name: validate
+name: gate  # ruleset required check 名为 gate（同 CI-Workflows 自测做法）
 on:
   pull_request:
   push:

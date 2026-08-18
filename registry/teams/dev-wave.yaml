@@ -10,6 +10,14 @@ orchestration:
   assign: leader-dispatch
   merge: leader-aggregate
   workflow_ref: workflows/dev-wave.flow.yaml
+verification:
+  in_team_check:
+    checkers: [agent:reviewer]          # 与 builder 不同声明；模型别名亦不同（coder-fast vs reviewer）
+    coverage: all-outputs
+  external_audit:
+    team: team:governance-core
+    frequency: weekly
+    method: [metrics-anomaly, re-check-sample, retrospective-review]
 workspace:
   shared:
     root: env:TEAM_WORKSPACE_ROOT         # 分布式部署 = 各节点同一 NFS 路径

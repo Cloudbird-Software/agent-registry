@@ -9,6 +9,11 @@ orchestration:
   assign: leader-dispatch
   merge: leader-aggregate
   workflow_ref: workflows/governance-core.flow.yaml
+verification:
+  # 审计者自身不由被审计方检查（无人可审审计者）→ 由平台防线兜底：
+  # main-protection + gate + drift-check §8 + owner 破玻璃回填制
+  in_team_check: {checkers: [], coverage: all-outputs, note: "curator 团队产出走平台防线（PR+gate），无内部 builder/checker 分离需求"}
+  external_audit: {team: "null:owner", frequency: weekly, method: [drift-review], note: "owner 周会审阅 drift 报告"}
 workspace:
   shared:
     root: env:GOVERNANCE_WORKSPACE_ROOT

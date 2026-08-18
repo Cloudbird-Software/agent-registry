@@ -1,7 +1,8 @@
 id: reviewer
-version: 1.0.0
+version: 1.1.0
 status: approved
-role: "代码评审与治理审计：PR 审查、政策符合性检查"
+archetype: checker
+role: "代码评审与治理审计：PR 审查、政策符合性检查；输出=判决+理由，不产实现"
 identity:
   prompt_ref: identities/reviewer.md
 model:
@@ -22,6 +23,12 @@ credential:
 memory:
   types: [semantic, episodic]
   retention: 90d
+guardrails:
+  output_schema_strict: true
+  must_run: ["make check"]
+  forbidden: [no-secret-output]
+  post_conditions:
+    - "[llm] 每条意见附依据（代码行/政策条目/风险说明）"
 expose:
   as_tool: true
   a2a_card: auto
