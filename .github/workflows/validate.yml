@@ -45,7 +45,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename')
+          # --paginate（评审项）：只读首页时 >100 文件的 PR 会把 C1 变更漏检成 changed=false
+          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename')
           if echo "$FILES" | grep -qE '^(standards/|decisions/|scripts/|\.github/|CODEOWNERS|tests/)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -60,7 +61,8 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          ADR_RE='ADR-[0-9]{4}'
+          # 词边界（评审项）：防 NOTADR-0013junk 之类子串满足 ADR 要求绕过
+          ADR_RE='\bADR-[0-9]{4}\b'
           if ! { echo "$PR_TITLE"; echo "$PR_BODY"; } | grep -qE "$ADR_RE"; then
             echo "::error::C1 路径变更（standards/decisions/scripts/.github/CODEOWNERS/tests）但 PR 未引用任何 ADR-NNNN（ADR-0013 adr-required）"
             exit 1

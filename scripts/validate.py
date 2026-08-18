@@ -312,14 +312,15 @@ for sid, s in skills.items():
 # ---- team 校验（v2：test-authors + verdict_by 机制）----
 for tm, t in teams.items():
     members = t.get("members")
-    if not members:
+    if not isinstance(members, list) or not members:
         # 成员下限 1（schema v2 minItems:1 的执行侧）——persistent 团队无成员 =
-        # 无人对治理资产负责（ADR-0013，issue #9 P0-1 的机器侧落地）
-        fail(f"team:{tm} members 缺失或为空（成员下限 1，ADR-0013）")
+        # 无人对治理资产负责（ADR-0013，issue #9 P0-1 的机器侧落地）。
+        # 类型防御（评审项）：members 为标量等真值非列表 → 结构错误而非崩溃
+        fail(f"team:{tm} members 缺失、为空或非列表（成员下限 1，ADR-0013）")
         members = []
     member_ids = []
     for m in members:
-        if not isinstance(m, dict) or not m.get("agent"):
+        if not isinstance(m, dict) or not isinstance(m.get("agent"), str) or not m.get("agent"):
             fail(f"team:{tm} 存在畸形成员条目: {m!r}（须为 {{agent: agent:<id>, ...}}）")
             continue
         aid = re.sub(r"^registry:", "", m.get("agent", "")).removeprefix("agent:").split("@")[0]
@@ -398,6 +399,13 @@ for tid, t in tools.items():
 # standards/ 与 registry/ 中一切 check:<id> 引用必须 ∈ standards/checks.yaml（fail-closed）。
 # 文本级扫描：引用嵌在自由文本（description/enforced_by/post_conditions）里，结构遍历会漏。
 CHECKS_REG = load_yaml(ROOT / "standards" / "checks.yaml") or {}
+# 根类型校验（评审项）：YAML 可解析为任意类型——列表/标量根须报结构错误而非崩溃
+if not isinstance(CHECKS_REG, dict):
+    fail(f"checks.yaml 根节点须为对象（version/checks），实为 {type(CHECKS_REG).__name__}")
+    CHECKS_REG = {}
+elif not isinstance(CHECKS_REG.get("checks"), list):
+    fail(f"checks.yaml 的 checks 须为列表，实为 {type(CHECKS_REG.get('checks')).__name__}")
+    CHECKS_REG["checks"] = []
 CHECKS = set()
 for _c in CHECKS_REG.get("checks", []) or []:
     # 条目结构校验（ADR-0013，PR#8 qodo 评审项）：畸形条目 fail 而非静默授权——
@@ -456,17 +464,29 @@ for cid in sorted(CHECKS - _scanned - _ext):
 # ---- ADR 编号唯一性（ADR-0013：issue #9 P1-6）----
 # decisions/ADR-NNNN-slug.md 编号冲突即 FAIL。唯一豁免 = ADR-0011 历史双档
 # （ADR-0012 消歧约定：不重编号、引用带主题限定——豁免在代码中显式记录出处）。
-ADR_DUP_EXEMPT = {"0011": "ADR-0012 消歧约定：历史双档不重编号"}
+# 豁免按精确文件集校验（评审项）：第三个 ADR-0011 文件或历史双档改名/缺失都 fail——
+# 豁免只覆盖这对已存在的文件，编号 0011 不因此可复用。
+ADR_DUP_EXEMPT = {
+    "0011": ("ADR-0011-runtime-egress-monitoring-and-scorecard.md",
+             "ADR-0011-team-collaboration-v1.md"),
+}
 _adr_files: dict = {}
 for _adr in sorted((ROOT / "decisions").glob("ADR-*.md")):
-    _m = re.match(r"ADR-(\d{4})-", _adr.name)
+    # 完整文件名匹配（评审项）：恰好 4 位数字 + 非空 slug——
+    # 防 ADR-12345-x.md（5 位被前缀读作 1234）与 ADR-0013-.md（空 slug）
+    _m = re.fullmatch(r"ADR-(\d{4})-(.+)\.md", _adr.name)
     if not _m:
-        fail(f"decisions/ 存在无法解析编号的 ADR 文件名: {_adr.name}（须为 ADR-NNNN-slug.md）")
+        fail(f"decisions/ 存在畸形 ADR 文件名: {_adr.name}（须为 ADR-NNNN-slug.md，slug 非空）")
         continue
     _adr_files.setdefault(_m.group(1), []).append(_adr.name)
 for _num, _files in _adr_files.items():
-    if len(_files) > 1 and _num not in ADR_DUP_EXEMPT:
-        fail(f"ADR 编号冲突: {' 与 '.join(_files)} 共用编号 {_num}（ADR-0013 编号唯一性）")
+    if len(_files) > 1:
+        _exempt = ADR_DUP_EXEMPT.get(_num)
+        if _exempt is None:
+            fail(f"ADR 编号冲突: {' 与 '.join(_files)} 共用编号 {_num}（ADR-0013 编号唯一性）")
+        elif tuple(sorted(_files)) != tuple(sorted(_exempt)):
+            fail(f"编号 {_num} 的多文件集合与豁免历史双档不符: {sorted(_files)}"
+                 f"（豁免仅覆盖 {sorted(_exempt)}——改名/增删/新增同号文件均不允许）")
 
 if errors:
     print(f"FAIL ({len(errors)}):")

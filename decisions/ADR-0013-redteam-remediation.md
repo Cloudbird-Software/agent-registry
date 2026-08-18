@@ -44,8 +44,9 @@
      base-validator/head-data 双 checkout 场景报错路径正确。
 
 3. **adr-required check 实装并转 active（CT-CUR-003 闭环）**：
-   - 本仓 validate.yml：PR 触及 C1 路径（standards/|scripts/|decisions/|.github/|CODEOWNERS）
-     时，PR body/title 必须含 `ADR-\d{4}`，且被引 ADR 文件须存在于 PR head 的 decisions/。
+   - 本仓 validate.yml：PR 触及 C1 路径（standards/|scripts/|decisions/|.github/|CODEOWNERS|tests/）
+     时，PR body/title 必须含 `ADR-\d{4}`（词边界匹配，防子串伪造），且被引 ADR 文件须存在于
+     PR head 的 decisions/；PR 文件清单分页读取（--paginate，防 >100 文件漏检）。
    - .github gate.yml：同规则（C1 路径为该仓布局）。
    - checks.yaml 中 adr-required 由 planned → active；ADR-0012 的实装待办清零。
 

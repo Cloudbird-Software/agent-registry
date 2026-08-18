@@ -42,7 +42,7 @@ checks:
 
   - id: adr-required
     status: active
-    where: C1 路径（standards/、decisions/、scripts/、.github/、CODEOWNERS）变更
+    where: C1 路径（standards/、decisions/、scripts/、.github/、CODEOWNERS、tests/）变更
       而 PR title/body 无 ADR-NNNN 引用、或被引 ADR 不在 PR head 的 decisions/
       则 fail（agent-registry validate.yml + .github gate.yml 的 adr-required
       步骤，ADR-0013 实装——CT-CUR-003 闭环；CODEOWNERS owner-only review

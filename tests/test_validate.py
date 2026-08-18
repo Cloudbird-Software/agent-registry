@@ -73,7 +73,17 @@ def test_adr_number_conflict_fails(tree: Path):
 def test_adr_bad_filename_fails(tree: Path):
     """无法解析编号的 ADR 文件名必须被拒绝"""
     (tree / "decisions" / "ADR-XX-broken.md").write_text("# x\n", encoding="utf-8")
-    assert_rejected(run_validate(tree), r"无法解析编号的 ADR 文件名")
+    assert_rejected(run_validate(tree), r"畸形 ADR 文件名.*ADR-XX-broken")
+
+def test_adr_empty_slug_fails(tree: Path):
+    """ADR-NNNN-.md（空 slug）不得被前缀匹配放行——须完整文件名校验"""
+    (tree / "decisions" / "ADR-0014-.md").write_text("# x\n", encoding="utf-8")
+    assert_rejected(run_validate(tree), r"畸形 ADR 文件名.*ADR-0014-")
+
+def test_adr_five_digit_number_fails(tree: Path):
+    """ADR-12345-x.md（5 位数字）不得被前缀截断读作 1234 而放行"""
+    (tree / "decisions" / "ADR-12345-x.md").write_text("# x\n", encoding="utf-8")
+    assert_rejected(run_validate(tree), r"畸形 ADR 文件名.*ADR-12345")
 
 
 # ── 负向：团队成员下限（issue #9 P0-1 的机器侧落地）────────────────
@@ -83,13 +93,29 @@ def test_team_without_members_fails(tree: Path):
     data = load_yaml(p)
     del data["members"]
     dump_yaml(p, data)
-    assert_rejected(run_validate(tree), r"team:stewardship members 缺失或为空")
+    assert_rejected(run_validate(tree), r"team:stewardship members 缺失、为空或非列表")
 
 def test_team_malformed_member_fails(tree: Path):
     """非 dict 成员条目不得让校验器崩溃或静默通过"""
     p = tree / "registry" / "teams" / "stewardship.yaml"
     data = load_yaml(p)
     data["members"] = ["agent:curator-main"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"畸形成员条目")
+
+def test_team_scalar_members_fails(tree: Path):
+    """members: true（真值标量）必须报结构错误而非 TypeError 崩溃"""
+    p = tree / "registry" / "teams" / "stewardship.yaml"
+    data = load_yaml(p)
+    data["members"] = True
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"members 缺失、为空或非列表")
+
+def test_team_nonstring_agent_member_fails(tree: Path):
+    """成员 agent 为非字符串值（如 1）必须报结构错误而非 re.sub 崩溃"""
+    p = tree / "registry" / "teams" / "stewardship.yaml"
+    data = load_yaml(p)
+    data["members"] = [{"agent": 1}]
     dump_yaml(p, data)
     assert_rejected(run_validate(tree), r"畸形成员条目")
 
@@ -134,6 +160,18 @@ def test_checks_registry_bad_status_missing_where_fails(tree: Path):
     dump_yaml(p, data)
     assert_rejected(run_validate(tree),
                     r"extra-check status 非法.*maybe", r"extra-check 缺 where")
+
+def test_checks_registry_list_root_fails(tree: Path):
+    """checks.yaml 根节点为列表必须报结构错误而非 AttributeError 崩溃"""
+    p = tree / "standards" / "checks.yaml"
+    dump_yaml(p, [{"id": "gate", "status": "active", "where": "x"}])
+    assert_rejected(run_validate(tree), r"checks.yaml 根节点须为对象")
+
+def test_checks_registry_scalar_checks_fails(tree: Path):
+    """checks: true（标量）必须报结构错误而非 TypeError 崩溃"""
+    p = tree / "standards" / "checks.yaml"
+    dump_yaml(p, {"version": 1, "checks": True})
+    assert_rejected(run_validate(tree), r"checks.yaml 的 checks 须为列表")
 
 
 # ── 负向：引用完整性（回归既有防线——改验证器时防破坏）──────────────
