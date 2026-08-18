@@ -17,7 +17,9 @@ permissions:
   inherit: org-default
   mode: normal
   overrides:
-    - {tools: [tool:write_file], pattern: "re:^(?!.*(plans|cards|specs)/).*", severity: HIGH}  # 只可写计划目录
+    # 仅允许写顶层 plans/|cards/|specs/（相对本 agent 工作区根）；其余显式 deny
+    # （normal 模式下 HIGH 仅 ask 不够；顶层锚定避免 src/plans/ 之类任意深度绕过）
+    - {tools: [tool:write_file], pattern: "re:^(?!(plans|cards|specs)/).*$", action: deny, severity: HIGH}
 memory:
   types: [semantic]
   retention: 90d

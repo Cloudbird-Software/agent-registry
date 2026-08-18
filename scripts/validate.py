@@ -108,6 +108,13 @@ for tid, t in teams.items():
     disputants = [a for a in member_ids if agents.get(a, {}).get("archetype") in ("builder", "checker")]
     for j in judges:
         ja = agents[j].get("model", {}).get("alias")
+        if not ja:
+            fail(f"team:{tid} 仲裁者 {j} 缺少 model.alias，无法验证裁决独立性（ADR-0008）")
+    for d in disputants:
+        if not agents[d].get("model", {}).get("alias"):
+            fail(f"team:{tid} 争议方 {d} 缺少 model.alias，无法验证裁决独立性（ADR-0008）")
+    for j in judges:
+        ja = agents[j].get("model", {}).get("alias")
         for d in disputants:
             da = agents[d].get("model", {}).get("alias")
             if ja and da and ja == da:
