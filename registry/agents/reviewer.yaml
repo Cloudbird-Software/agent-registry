@@ -23,8 +23,10 @@ independence:
 permissions:
   inherit: org-default
   overrides:
-    - {tools: [tool:write_file], pattern: "src/**", action: deny}          # 写路径限 tests/**（CT-TA-001）
+    # 默认拒绝：只放行 tests/**（CT-TA-001 写路径限制——CodeRabbit #5 建议的 default-deny 形式）
+    - {tools: [tool:write_file], pattern: "re:^(?!tests/).*$", action: deny}
     - {tools: [tool:write_file], pattern: "tests/unit/**", action: deny}   # unit 属 builder（设计工具）
+    - {tools: [tool:write_file], pattern: "tests/acceptance/**", action: allow}
 credential:
   github_app: cloudbird-agent
   secrets: []

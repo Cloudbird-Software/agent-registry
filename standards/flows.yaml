@@ -13,8 +13,8 @@ intent_ratification:
     3: owner 逐条批准/修改 → 签名+hash 落事件流（intent.ratified_by=owner）
     4: 未批准的意图不得开卡（check:intent-ratified，scheduler 前置，CT-PLN-003）
   acceptance_digest:
-    rule: 波次完成时产出一屏证据包（curl 记录/截图/golden diff/verdict 逐条对照已批示例）——不是只给 "verdict: pass"
-    why: owner 的注意力应花在"这是我想要的吗"，不是"测试绿了吗"
+    rule: "波次完成时产出一屏证据包（curl 记录/截图/golden diff/verdict 逐条对照已批示例）——不是只给 verdict:pass"
+    why: "owner 的注意力应花在『这是我想要的吗』，不是『测试绿了吗』"
 
 # ---- B. 现实反馈：escape 闭环（唯一能真实评价验证体系的指标）----
 escape_review:

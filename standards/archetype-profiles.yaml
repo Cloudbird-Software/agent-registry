@@ -16,7 +16,7 @@ version: 2
 #   capabilities.allow   副作用白名单（side-effects.yaml v2 词表；未列出即禁止）
 #   capabilities.agent_tools {allow: 原型白名单, max: 数量上限}（白名单，v1 黑名单废弃）
 #   isolation   private（独立工作区）| hermetic（密闭：连共享记忆也无关）| team
-#   approval    auto | ask_risky | ask_per_action（与 isolation 正交；v1 strict 双义拆分）
+#   approval    auto | ask_risky | ask_per_action | async_notify（与 isolation 正交；v1 strict 双义拆分）
 #   independence.distinct_model_family_from   模型族级隔离（models.yaml family；别名级太弱）
 #   duty_assurance.structural  每条 = {claim, enforced_by, control_test}——
 #                              control_test 是 adversary 执行的控制测试 id（control-tests.yaml）
@@ -207,7 +207,7 @@ profiles:
         - claim: "C1 变更无 ADR 不合并"
           enforced_by: ["check:adr-required"]
           control_test: CT-CUR-003
-    verified_by:
+      verified_by:
         - owner 周审 drift 报告与治理 PR
         - adversary 独立执行控制测试（curator 无法阻止）
     requires: [guardrails.must_run]

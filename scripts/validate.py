@@ -79,6 +79,22 @@ _se = load_yaml(ROOT / "standards" / "side-effects.yaml") or {}
 for _grp in (_se.get("groups") or {}).values():
     VOCAB.update(_grp.keys())
 CT_REG = (load_yaml(ROOT / "standards" / "control-tests.yaml") or {}).get("tests", {})
+# 标准文件可解析性（flows/change-classes 暂无结构校验，先保证解析不失败——CodeRabbit #5）
+for _std in ("flows.yaml", "change-classes.yaml"):
+    if (load_yaml(ROOT / "standards" / _std) or {}) == {}:
+        fail(f"standards/{_std} 缺失或解析为空（标准文件必须可解析，ADR-0010）")
+
+# profiles 字段取值域（防 agent 与 profile 同时用错值时仍通过——CodeRabbit #5）
+_ENUMS = {
+    "isolation": {"private", "hermetic", "team"},
+    "approval": {"auto", "ask_risky", "ask_per_action", "async_notify"},
+    "trust_zone": {"untrusted_ingest", "trusted_control"},
+}
+for _arch, _prof in PROFILES.items():
+    for _f, _vals in _ENUMS.items():
+        _v = _prof.get(_f)
+        if _v is not None and _v not in _vals:
+            fail(f"profile:{_arch} {_f}={_v!r} 不在合法取值域 {sorted(_vals)}")
 
 # ---- gateway 配置对齐（ADR-0002 rev1）----
 GW_CFG = DATA / "deploy" / "llm-gateway" / "config.yaml"
@@ -109,6 +125,15 @@ for arch, prof in PROFILES.items():
             continue
         if s["control_test"] not in CT_REG:
             fail(f"profile:{arch} structural 引用的 {s['control_test']} 未在 control-tests.yaml 登记（ct-coverage）")
+
+# ct-coverage 反向：登记但无任何 profile 引用的 CT = 漂移（CT-ADV-003 一一对应——CodeRabbit #5）
+_referenced = set()
+for _prof in PROFILES.values():
+    for _s in ((_prof.get("duty_assurance") or {}).get("structural") or []):
+        if isinstance(_s, dict) and _s.get("control_test"):
+            _referenced.add(_s["control_test"])
+for _ct in set(CT_REG) - _referenced:
+    fail(f"control-tests.yaml 登记 {_ct} 未被任何 profile structural 引用（ct-coverage 反向，一一对应）")
 
 # ---- agent 校验 ----
 for aid, a in agents.items():
@@ -228,22 +253,24 @@ for tm, t in teams.items():
     arch_of = lambda x: (agents.get(x) or {}).get("archetype")  # noqa: E731
     fam_of = lambda x: agents.get(x, {}).get("_family")  # noqa: E731
 
-    # 族级独立性：test-author/judge vs 争议方（builder/test-author）
+    # 族级独立性（按 profile 声明比对，不硬编码原型——CodeRabbit #5）：
+    # 每个成员 x 的 profile.independence.distinct_model_family_from 列出须异族的原型 A；
+    # x 与团队内/验收引用中的 A 实例逐个比族。
     ver = t.get("verification", {})
     authors = [(c.removeprefix("agent:").split("@")[0]) for c in ver.get("test_authors", []) or []]
-    judges = [a for a in member_ids if arch_of(a) == "judge"]
-    disputants = [a for a in member_ids if arch_of(a) in ("builder", "test-author")] + authors
-    for x in authors + judges:
+    pool = list(dict.fromkeys(member_ids + authors))   # 成员 ∪ 验收出题者
+    for x in pool:
+        prof = PROFILES.get(arch_of(x)) or {}
+        need = ((prof.get("independence") or {}).get("distinct_model_family_from")) or []
+        if not need:
+            continue
         if not fam_of(x):
-            fail(f"team:{tm} 验收方 {x} 缺 family 映射，无法验证族独立性（ADR-0010）")
-    for x in authors + judges:
-        for d in disputants:
-            if x == d:
-                continue
-            if arch_of(x) == "judge" and arch_of(d) == "judge":
+            fail(f"team:{tm} {x} 的原型声明 independence 但缺 family 映射（ADR-0010）")
+        for d in pool:
+            if d == x or arch_of(d) not in need:
                 continue
             if fam_of(x) and fam_of(d) and fam_of(x) == fam_of(d):
-                fail(f"team:{tm} {x} 与 {d} 同模型族 {fam_of(x)}（族级独立性不足，ADR-0010）")
+                fail(f"team:{tm} {x}({arch_of(x)}) 与 {d}({arch_of(d)}) 同模型族 {fam_of(x)}（族级独立性，ADR-0010）")
 
     # AR-9 v2：含 builder 的团队——test_authors + verdict_by 机制 + external_audit
     builders = [a for a in member_ids if arch_of(a) == "builder"]
