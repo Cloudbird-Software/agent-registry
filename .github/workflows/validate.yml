@@ -33,23 +33,49 @@ jobs:
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: "3.12"
-      - run: pip install pyyaml
-      # 标准/校验器变更检测（ADR-0011）：C1 型 PR（standards/scripts/CODEOWNERS/.github 变更）
+      - run: pip install pyyaml pytest
+      # 标准/校验器变更检测（ADR-0011）：C1 型 PR（standards/decisions/scripts/CODEOWNERS/.github 变更）
       # 的规则与数据必须同源演进——base 旧规则审 head 新数据在词汇/结构演进上结构性不可行
-      # （如词表新增）。此类 PR 的防线=CODEOWNERS owner-only 审查（C1）+ head 自洽双跑（下方）；
-      # base 侧防线保留给纯数据 PR（C2/C3）——ADR-0010 批次4 的防削弱场景不变。
+      # （如词表新增）。此类 PR 的防线=CODEOWNERS owner-only 审查（C1）+ head 自洽双跑（下方）+
+      # adr-required（ADR-0013：C1 变更必须引用 ADR）；base 侧防线保留给纯数据 PR（C2/C3）
+      # ——ADR-0010 批次4 的防削弱场景不变。
       - name: standards diff detection
         id: stddiff
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename')
-          if echo "$FILES" | grep -qE '^(standards/|scripts/|\.github/|CODEOWNERS)'; then
+          # --paginate（评审项）：只读首页时 >100 文件的 PR 会把 C1 变更漏检成 changed=false
+          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename')
+          if echo "$FILES" | grep -qE '^(standards/|decisions/|scripts/|\.github/|CODEOWNERS|tests/)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+      # adr-required（ADR-0013 实装，checks.yaml 转 active——CT-CUR-003 闭环）：
+      # C1 路径变更的 PR，title/body 必须引用 ADR-NNNN 且被引 ADR 须存在于
+      # PR head 的 decisions/（防"引用已在 main 被拒/未合入的幽灵 ADR"）。
+      - name: adr-required（C1 变更须引用 ADR）
+        if: github.event_name == 'pull_request' && steps.stddiff.outputs.changed == 'true'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # 词边界（评审项）：防 NOTADR-0013junk 之类子串满足 ADR 要求绕过
+          ADR_RE='\bADR-[0-9]{4}\b'
+          if ! { echo "$PR_TITLE"; echo "$PR_BODY"; } | grep -qE "$ADR_RE"; then
+            echo "::error::C1 路径变更（standards/decisions/scripts/.github/CODEOWNERS/tests）但 PR 未引用任何 ADR-NNNN（ADR-0013 adr-required）"
+            exit 1
+          fi
+          MISSING=0
+          for ref in $( { echo "$PR_TITLE"; echo "$PR_BODY"; } | grep -oE "$ADR_RE" | sort -u ); do
+            num="${ref#ADR-}"
+            if ! ls data/decisions/ADR-"${num}"-*.md >/dev/null 2>&1; then
+              echo "::error::引用的 ${ref} 在 PR head 的 decisions/ 无对应文件"
+              MISSING=1
+            fi
+          done
+          exit $MISSING
       # 防线：base 的标准审 head 的数据（required——安全保证；仅纯数据 PR）
       - name: validate（标准=base，数据=head）
         if: github.event_name == 'pull_request' && steps.stddiff.outputs.changed != 'true'
@@ -65,9 +91,18 @@ jobs:
       - name: simulate（标准=head 自洽）
         if: github.event_name == 'pull_request'
         run: python3 data/scripts/simulate-wave.py
+      # 元验证（ADR-0013，issue #9 P0-2）：validate.py 自身正确性的回归基线——
+      # 正向（全树绿）+ 负向（注入缺陷必须被拒绝）。失败即 gate 失败，阻塞合并。
+      - name: meta-validate（pytest，head 自洽）
+        if: github.event_name == 'pull_request'
+        working-directory: data
+        run: python -m pytest tests/ -v
       - name: validate（main）
         if: github.event_name != 'pull_request'
         run: python3 scripts/validate.py
       - name: simulate（main）
         if: github.event_name != 'pull_request'
         run: python3 scripts/simulate-wave.py
+      - name: meta-validate（pytest，main）
+        if: github.event_name != 'pull_request'
+        run: python -m pytest tests/ -v

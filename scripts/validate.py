@@ -311,8 +311,18 @@ for sid, s in skills.items():
 
 # ---- team 校验（v2：test-authors + verdict_by 机制）----
 for tm, t in teams.items():
+    members = t.get("members")
+    if not isinstance(members, list) or not members:
+        # 成员下限 1（schema v2 minItems:1 的执行侧）——persistent 团队无成员 =
+        # 无人对治理资产负责（ADR-0013，issue #9 P0-1 的机器侧落地）。
+        # 类型防御（评审项）：members 为标量等真值非列表 → 结构错误而非崩溃
+        fail(f"team:{tm} members 缺失、为空或非列表（成员下限 1，ADR-0013）")
+        members = []
     member_ids = []
-    for m in t.get("members", []):
+    for m in members:
+        if not isinstance(m, dict) or not isinstance(m.get("agent"), str) or not m.get("agent"):
+            fail(f"team:{tm} 存在畸形成员条目: {m!r}（须为 {{agent: agent:<id>, ...}}）")
+            continue
         aid = re.sub(r"^registry:", "", m.get("agent", "")).removeprefix("agent:").split("@")[0]
         member_ids.append(aid)
         if aid not in agents:
@@ -385,31 +395,98 @@ for tid, t in tools.items():
         if ot not in teams or teams[ot].get("lifecycle", {}).get("type") != "persistent":
             fail(f"tool:{tid} 的 owner 不是 persistent 团队: {owner}")
 
-# ---- check:* 注册表校验（ADR-0012：悬空防线不可声明）----
+# ---- check:* 注册表校验（ADR-0012：悬空防线不可声明；ADR-0013：条目结构硬化）----
 # standards/ 与 registry/ 中一切 check:<id> 引用必须 ∈ standards/checks.yaml（fail-closed）。
 # 文本级扫描：引用嵌在自由文本（description/enforced_by/post_conditions）里，结构遍历会漏。
 CHECKS_REG = load_yaml(ROOT / "standards" / "checks.yaml") or {}
-CHECKS = {c.get("id") for c in CHECKS_REG.get("checks", []) if isinstance(c, dict)}
+# 根类型校验（评审项）：YAML 可解析为任意类型——列表/标量根须报结构错误而非崩溃
+if not isinstance(CHECKS_REG, dict):
+    fail(f"checks.yaml 根节点须为对象（version/checks），实为 {type(CHECKS_REG).__name__}")
+    CHECKS_REG = {}
+elif not isinstance(CHECKS_REG.get("checks"), list):
+    fail(f"checks.yaml 的 checks 须为列表，实为 {type(CHECKS_REG.get('checks')).__name__}")
+    CHECKS_REG["checks"] = []
+CHECKS = set()
+for _c in CHECKS_REG.get("checks", []) or []:
+    # 条目结构校验（ADR-0013，PR#8 qodo 评审项）：畸形条目 fail 而非静默授权——
+    # 注册表是防线的单一真源，注册表层自身必须先可信
+    if not isinstance(_c, dict):
+        fail(f"checks.yaml 存在非对象条目: {_c!r}（条目结构: id/status/where）")
+        continue
+    _cid = _c.get("id")
+    if not (isinstance(_cid, str) and re.fullmatch(r"[a-z][a-z0-9-]*", _cid)):
+        fail(f"checks.yaml 条目 id 非法: {_cid!r}（合法语法 ^[a-z][a-z0-9-]*$）")
+        continue
+    if _cid in CHECKS:
+        fail(f"checks.yaml 条目 id 重复: {_cid}")
+        continue
+    if _c.get("status") not in ("active", "planned"):
+        fail(f"checks.yaml 条目 {_cid} status 非法: {_c.get('status')!r}（须为 active|planned）")
+    if not _c.get("where"):
+        fail(f"checks.yaml 条目 {_cid} 缺 where（实现位置——悬空代价须显式承担）")
+    if "consumed_externally" in _c and not isinstance(_c.get("consumed_externally"), bool):
+        fail(f"checks.yaml 条目 {_cid} consumed_externally 非布尔: {_c.get('consumed_externally')!r}")
+    CHECKS.add(_cid)
 if not CHECKS:
     fail("standards/checks.yaml 注册表为空或缺失（ADR-0012）")
-check_re = re.compile(r"check:([a-z][a-z0-9-]*)")
-for scope_root in (ROOT / "standards", REG):
+# 引用侧完整 token 匹配（ADR-0013，PR#8 qodo 评审项）：
+#   捕获 [A-Za-z0-9_-]+ 全串再校验语法——防 `check:gate_typo` 被旧正则
+#   ([a-z][a-z0-9-]*) 前缀截断读作已注册的 gate 而静默放行；
+#   标识前加词边界——防 `healthcheck:x` 中的 check 片段被误读为防线引用。
+# 诊断路径相对各自扫描根（standards→ROOT / registry→DATA）：双 checkout
+# （base-validator / head-data）场景下报错路径不串根。
+check_re = re.compile(r"(?<![A-Za-z0-9_-])check:([A-Za-z0-9_-]+)")
+for scope_root, rel_root in ((ROOT / "standards", ROOT), (REG, DATA)):
+    if not scope_root.is_dir():
+        continue
     for p in scope_root.rglob("*.yaml"):
         for m in check_re.finditer(p.read_text(encoding="utf-8")):
-            if m.group(1) not in CHECKS:
-                fail(f"{p.relative_to(ROOT)} 引用未注册的 check:{m.group(1)}"
-                     f"（不在 standards/checks.yaml——悬空防线）")
+            ref = m.group(1)
+            if ref in CHECKS:
+                continue
+            hint = "" if re.fullmatch(r"[a-z][a-z0-9-]*", ref) else "（畸形 id——合法语法 ^[a-z][a-z0-9-]*$）"
+            fail(f"{p.relative_to(rel_root)} 引用未注册的 check:{ref}{hint}"
+                 f"（不在 standards/checks.yaml——悬空防线）")
 # 反向：登记但无任何声明引用 = 注册表漂移（与 ct-coverage 反向同模式；
 # consumed_externally 的条目消费方在平台仓，跳过）
 _scanned = set()
-for scope_root in (ROOT / "standards", REG):
+for scope_root, rel_root in ((ROOT / "standards", ROOT), (REG, DATA)):
+    if not scope_root.is_dir():
+        continue
     for p in scope_root.rglob("*.yaml"):
         if p.name == "checks.yaml":
             continue
         _scanned.update(check_re.findall(p.read_text(encoding="utf-8")))
-_ext = {c.get("id") for c in CHECKS_REG.get("checks", []) if c.get("consumed_externally")}
+_ext = {c.get("id") for c in CHECKS_REG.get("checks", []) if isinstance(c, dict) and c.get("consumed_externally")}
 for cid in sorted(CHECKS - _scanned - _ext):
     fail(f"checks.yaml 登记 {cid} 未被任何声明引用（注册表漂移——登记项须有消费方）")
+
+# ---- ADR 编号唯一性（ADR-0013：issue #9 P1-6）----
+# decisions/ADR-NNNN-slug.md 编号冲突即 FAIL。唯一豁免 = ADR-0011 历史双档
+# （ADR-0012 消歧约定：不重编号、引用带主题限定——豁免在代码中显式记录出处）。
+# 豁免按精确文件集校验（评审项）：第三个 ADR-0011 文件或历史双档改名/缺失都 fail——
+# 豁免只覆盖这对已存在的文件，编号 0011 不因此可复用。
+ADR_DUP_EXEMPT = {
+    "0011": ("ADR-0011-runtime-egress-monitoring-and-scorecard.md",
+             "ADR-0011-team-collaboration-v1.md"),
+}
+_adr_files: dict = {}
+for _adr in sorted((ROOT / "decisions").glob("ADR-*.md")):
+    # 完整文件名匹配（评审项）：恰好 4 位数字 + 非空 slug——
+    # 防 ADR-12345-x.md（5 位被前缀读作 1234）与 ADR-0013-.md（空 slug）
+    _m = re.fullmatch(r"ADR-(\d{4})-(.+)\.md", _adr.name)
+    if not _m:
+        fail(f"decisions/ 存在畸形 ADR 文件名: {_adr.name}（须为 ADR-NNNN-slug.md，slug 非空）")
+        continue
+    _adr_files.setdefault(_m.group(1), []).append(_adr.name)
+for _num, _files in _adr_files.items():
+    if len(_files) > 1:
+        _exempt = ADR_DUP_EXEMPT.get(_num)
+        if _exempt is None:
+            fail(f"ADR 编号冲突: {' 与 '.join(_files)} 共用编号 {_num}（ADR-0013 编号唯一性）")
+        elif tuple(sorted(_files)) != tuple(sorted(_exempt)):
+            fail(f"编号 {_num} 的多文件集合与豁免历史双档不符: {sorted(_files)}"
+                 f"（豁免仅覆盖 {sorted(_exempt)}——改名/增删/新增同号文件均不允许）")
 
 if errors:
     print(f"FAIL ({len(errors)}):")

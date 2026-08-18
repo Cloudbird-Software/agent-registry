@@ -3,9 +3,11 @@
 # curator 也无法自批（CT-CUR-002 的平台防线）。
 # 默认：本仓一切变更 owner 知情
 *                               @randypanding
-# 治理之治理：标准/校验器/词表/控制测试/CODEOWNERS 自身——owner-only 硬路径
+# 治理之治理：标准/校验器/校验器测试/词表/控制测试/CODEOWNERS 自身——owner-only 硬路径
+# tests/ = validate.py 元验证套件（ADR-0013）——验证器与其测试同属治理之治理路径
 /standards/**                   @randypanding
 /scripts/validate.py            @randypanding
+/tests/**                       @randypanding
 /CODEOWNERS                     @randypanding
 /.github/**                     @randypanding
 /decisions/**                   @randypanding

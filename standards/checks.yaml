@@ -41,13 +41,12 @@ checks:
       激活前由 token-path-scope 部分承担；profiles 三处 enforced_by 引用
 
   - id: adr-required
-    status: planned
-    where: C1 路径（standards/、decisions/、scripts/、.github/、CODEOWNERS）变更
-      而 PR 无 ADR 引用则 fail。注意：当前无 CI job 实装——CT-CUR-003 的
-      expected（adr-required check 失败）在该 check 实装前不可执行，
-      现行防线=CODEOWNERS owner-only review（CT-CUR-002）+ ruleset main-protection。
-      实装后 CT-CUR-003 方可闭环（待办：validate.yml 增 job，判定规则=PR 触及
-      C1 路径且 body/diff 无 ADR-\d{4} 引用）
+    status: active
+    where: C1 路径（standards/、decisions/、scripts/、.github/、CODEOWNERS、tests/）变更
+      而 PR title/body 无 ADR-NNNN 引用、或被引 ADR 不在 PR head 的 decisions/
+      则 fail（agent-registry validate.yml + .github gate.yml 的 adr-required
+      步骤，ADR-0013 实装——CT-CUR-003 闭环；CODEOWNERS owner-only review
+      仍在，双防线）
 
   - id: rollback-plan-required
     status: active
