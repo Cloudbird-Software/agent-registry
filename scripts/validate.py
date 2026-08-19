@@ -177,6 +177,58 @@ for _prof in PROFILES.values():
 for _ct in set(CT_REG) - _referenced:
     fail(f"control-tests.yaml 登记 {_ct} 未被任何 profile structural 引用（ct-coverage 反向，一一对应）")
 
+# ---- 机制命名绑定与引用完整性（ADR-0021：红队批次3——ghost 机制/命名三态灭绝）----
+# ① services 下划线键 ↔ 机制原型连字符 id 互译（kind=mechanism 的服务块必带 id）
+# ② 一切 mechanism:X 引用必须解析到机制原型（悬空机制=角色无法被触发的门禁盲区）
+# ③ 团队原型 services 列表必须解析到 services 块（被引用才被声明）
+_services = _TC.get("services") or {}
+for _svc, _sdef in _services.items():
+    if not isinstance(_sdef, dict) or not str(_sdef.get("kind", "")).startswith("mechanism"):
+        continue
+    _mid = _sdef.get("id")
+    if not _mid:
+        fail(f"services.{_svc} kind=mechanism 缺 id（须=archetype-profiles 机制原型键——命名绑定单一真源，ADR-0021）")
+    elif _mid not in MECHANISM_ARCHETYPES:
+        fail(f"services.{_svc} id={_mid!r} 不是机制原型（archetype-profiles 无此 mechanism 键，ADR-0021）")
+    elif _svc != _mid.replace("-", "_"):
+        fail(f"services.{_svc} 与其 id={_mid!r} 不互译（键=下划线形式——同实体三种写法即漂移，ADR-0021）")
+_mech_re = re.compile(r"mechanism:([A-Za-z][A-Za-z0-9_-]*)")
+for scope_root, rel_root in ((ROOT / "standards", ROOT), (REG, DATA)):
+    if not scope_root.is_dir():
+        continue
+    for p in scope_root.rglob("*.yaml"):
+        for m in _mech_re.finditer(p.read_text(encoding="utf-8")):
+            ref = m.group(1)
+            if ref not in MECHANISM_ARCHETYPES:
+                fail(f"{p.relative_to(rel_root)} 引用 mechanism:{ref} 无机制原型（ghost 机制——被依赖却不存在的执行者，ADR-0021）")
+for _proto, _pdef in (_TC.get("teams") or {}).items():
+    if not isinstance(_pdef, dict):
+        continue
+    for _s in (_pdef.get("services") or []):
+        if str(_s).rstrip("*") not in _services:
+            fail(f"teams.{_proto}.services 引用不存在的 services 块: {_s}（团队依赖的服务无声明=运行无主，ADR-0021）")
+
+# ---- 幽灵角色检测（ADR-0021：approved agent 必须有消费方——声明有主运行无主即漂移）----
+_bound_agents = set()
+for _t in teams.values():
+    _ms = _t.get("members")
+    if isinstance(_ms, list):
+        for _m in _ms:
+            if isinstance(_m, dict) and isinstance(_m.get("agent"), str):
+                _bound_agents.add(re.sub(r"^registry:", "", _m["agent"]).removeprefix("agent:").split("@")[0])
+for _sdef in _services.values():
+    if isinstance(_sdef, dict) and isinstance(_sdef.get("members"), list):
+        for _m in _sdef["members"]:
+            _bound_agents.add(str(_m).removeprefix("agent:").split("@")[0])
+for _a in agents.values():
+    _refs = ((_a.get("capabilities") or {}).get("agent_tools") or {}).get("refs")
+    if isinstance(_refs, list):
+        for _r in _refs:
+            _bound_agents.add(str(_r).removeprefix("agent:").split("@")[0])
+for _aid, _a in agents.items():
+    if _a.get("status") == "approved" and _aid not in _bound_agents:
+        fail(f"agent:{_aid} approved 但无任何团队/服务/agent_tools 引用（幽灵角色——无触发路径的声明，ADR-0021）")
+
 # ---- 上下文装配与记忆契约（ADR-0018）----
 # spawn manifest：装配覆盖一切 LLM 原型；组件 ⊆ 词表；memory_view ⟺ 记忆类型非空。
 # simulate 测相位/权限/预算、gate 测产品代码——本块管"agent 启动时拿到什么"的声明层。

@@ -13,7 +13,8 @@ members:
 - agent: agent:deployer
   seat: deployer
   count: 1
-  as_tool: false            # 常备绑定；deployer 仅在 sev1 前进修复（owner_required）时激活动作
+  as_tool: false            # 常备绑定=预占座位（PART2 seats 0..1 按需激活的实例侧表达——ADR-0021 口径对齐）；
+                            # deployer 仅在 sev1 前进修复（owner_required）时激活动作
 topology: single-seat（responder 主战；deployer 按需）
 orchestration:
   assign: 外部告警/deployer 移交/owner 呼叫触发实例化（severity_classified_by 见 PART 2；responder 无定级权）
@@ -53,7 +54,8 @@ lifecycle:
   type: ephemeral
   trigger: incident.sev_alert        # 外部告警/deployer 移交/owner 呼叫（trigger_sources 见 PART 2）
   ttl: 72h
-  on_ttl_expiry: escalate_to_owner + extension_requires_owner（绝不 auto-destroy）
+  on_ttl_expiry: escalate_to_owner + extension_requires_owner（绝不 auto-destroy；owner 持续不可达
+    再 72h → parked 出口——保守稳态交接 maintenance wave，见 PART2 ADR-0021）
   archive_to: team:stewardship
   handoff:                           # 执行者见 PART 2 incident_cell.lifecycle.handoff
   - incident_report

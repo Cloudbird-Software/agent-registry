@@ -294,3 +294,51 @@ def test_project_missing_license_fails(tree: Path):
     del data["projects"][0]["license"]
     dump_yaml(p, data)
     assert_rejected(run_validate(tree), r"openJiuwen-ai/jiuwenswarm 缺 license")
+
+
+# ── 负向：机制命名绑定与引用完整性（ADR-0021）─────────────────────
+def test_dangling_mechanism_ref_fails(tree: Path):
+    """mechanism:引用无机制原型 = ghost 机制，必须被拒绝"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    p.write_text(p.read_text(encoding="utf-8").replace(
+        "gate.pass:                  mechanism:verifier",
+        "gate.pass:                  mechanism:ghost-engine"),
+        encoding="utf-8")
+    assert_rejected(run_validate(tree), r"引用 mechanism:ghost-engine 无机制原型")
+
+def test_mechanism_service_without_binding_id_fails(tree: Path):
+    """kind=mechanism 服务块缺 id = 命名绑定断链，必须被拒绝"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    del data["services"]["card_gate"]["id"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"services.card_gate kind=mechanism 缺 id")
+
+def test_mechanism_service_bad_binding_fails(tree: Path):
+    """服务块 id 指向不存在的机制原型，必须被拒绝"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    data["services"]["card_gate"]["id"] = "no-such-prototype"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"services.card_gate id='no-such-prototype' 不是机制原型")
+
+def test_team_services_dangling_ref_fails(tree: Path):
+    """团队原型 services 引用不存在的服务块，必须被拒绝"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    data["teams"]["delivery_squad"]["services"] = ["card_gate", "phantom_service"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"teams.delivery_squad.services 引用不存在的 services 块: phantom_service")
+
+
+# ── 负向：幽灵角色检测（ADR-0021）─────────────────────────────────
+def test_orphan_approved_agent_fails(tree: Path):
+    """approved agent 无任何团队/服务/agent_tools 引用 = 幽灵角色，必须被拒绝"""
+    ghost = tree / "registry" / "agents" / "ghost-role.yaml"
+    shutil.copy(tree / "registry" / "agents" / "responder.yaml", ghost)
+    data = load_yaml(ghost)
+    data["id"] = "ghost-role"
+    # 换 alias 避免撞独立性检查；本质仍是全量字段合法但无消费方的 approved 声明
+    data["model"]["alias"] = "coder-deep"
+    dump_yaml(ghost, data)
+    assert_rejected(run_validate(tree), r"agent:ghost-role approved 但无任何团队/服务/agent_tools 引用")

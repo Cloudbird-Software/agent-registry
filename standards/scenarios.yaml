@@ -104,6 +104,7 @@ scenarios:
       - {path: "standards/change-classes.yaml#classes.trivial.review", op: contains, value: verifier}
       - {path: "standards/change-classes.yaml#classes.trivial.merge", op: contains, value: integrator auto}
       - {path: "standards/change-classes.yaml#classes.trivial.promote_if", op: exists}
+      - {path: "standards/change-classes.yaml#classes.trivial.promote_if", op: contains, value: 拆分绕过检测}
     ct_refs: []
   S14-maintain-loop:
     class: regression
@@ -199,4 +200,61 @@ scenarios:
       - {path: "registry/projects.yaml#audit_policy.routing", op: contains, value: maintain_loop}
       - {path: "registry/tools/bash.yaml#implementation.repo", op: eq, value: openJiuwen-ai/jiuwenswarm}
       - {path: "standards/checks.yaml#checks", op: contains, value: supply-audit}
+    ct_refs: []
+
+  # ── S21-S24 新场景（ADR-0021：红队批次3——owner 缺席/无发布面/重试耗尽/机制完备）──
+  S21-owner-absence-defaults:
+    class: regression
+    narrative: owner 长期不可用→同步阻塞点按超时默认动作降级：意图 7d 未批=暂存回
+      backlog+波次善后销毁（绝不默认批准）；sev1 前进修复 24h 未批=维持保守稳态（绝不
+      默认前进）；事故 TTL 后 owner 仍不可达→parked 交接 maintenance wave——等待失联者
+      不是稳态
+    asserts:
+      - {path: "standards/attention-ledger.yaml#synchronous", op: contains_all, value: [intent_ratification, sev1_forward_fix_authorization]}
+      - {path: "standards/attention-ledger.yaml#synchronous.0.default_on_timeout_7d", op: contains, value: 绝不默认批准}
+      - {path: "standards/attention-ledger.yaml#synchronous.1.default_on_timeout_24h", op: contains, value: 绝不默认前进修复}
+      - {path: "standards/team-collaboration.yaml#teams.incident_cell.lifecycle.on_ttl_expiry", op: contains, value: parked}
+      - {path: "standards/team-collaboration.yaml#artifacts.card.lifecycle.amendment.escalate_when", op: contains, value: 默认整波回炉}
+    ct_refs: []
+  S22-no-release-wave-destroy:
+    class: regression
+    narrative: 纯 doc/spike 波次无发布面→released_behind_flag/reverted 永不发生→
+      integrate→handoff 边与 destroy 条件含 no_release_face(wave)（merge/入库即交接）——
+      ephemeral 队不泄漏；spike 的 ADR 草案产出落在 delivery scope may_touch
+    asserts:
+      - {path: "standards/team-collaboration.yaml#flow.phases.graph", op: contains, value: no_release_face(wave)}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.destroy", op: contains, value: no_release_face}
+      - {path: "registry/teams/dev-wave.yaml#lifecycle.destroy_condition", op: contains, value: no_release_face}
+      - {path: "standards/team-collaboration.yaml#scopes.delivery.may_touch", op: contains, value: ADR 草案}
+      - {path: "standards/team-collaboration.yaml#artifacts.card.types.spike.output_must_be", op: contains, value: ADR 草案}
+    ct_refs: []
+  S23-retries-exhausted-replan:
+    class: regression
+    narrative: 返工循环 retries 耗尽→retries.exhausted 事件（producer=scheduler）→
+      any→plan 回炉重规划边——承诺"必须回 planner"有相位载体；争议期 budget_clock 暂停
+      但 retries 计数不暂停（争议循环不能绕过重试门禁）
+    asserts:
+      - {path: "standards/team-collaboration.yaml#flow.event_producers.retries.exhausted", op: exists}
+      - {path: "standards/team-collaboration.yaml#flow.phases.graph", op: contains, value: retries.exhausted}
+      - {path: "standards/flows.yaml#budget.enforcement", op: contains, value: 回 planner}
+      - {path: "standards/team-collaboration.yaml#artifacts.card.lifecycle.amendment.during", op: exists}
+    ct_refs: []
+  S24-mechanism-completeness:
+    class: regression
+    narrative: 交付链引用的一切机制有原型+有服务块：scheduler/verifier/integrator/
+      evidence_pack/metrics_aggregator 齐备且 id 绑定机制原型；"gate"只是判决层名
+      （实体=verifier，无独立 gate 机制）；memory-export 执行者=handoff 相位在场座位
+      （planner 已退场——无死人执行者）
+    asserts:
+      - {path: "standards/team-collaboration.yaml#services.scheduler.id", op: eq, value: scheduler}
+      - {path: "standards/team-collaboration.yaml#services.verifier.id", op: eq, value: verifier}
+      - {path: "standards/team-collaboration.yaml#services.integrator.id", op: eq, value: integrator}
+      - {path: "standards/team-collaboration.yaml#services.evidence_pack.id", op: eq, value: evidence-pack}
+      - {path: "standards/team-collaboration.yaml#services.metrics_aggregator.id", op: eq, value: metrics-aggregator}
+      - {path: "standards/team-collaboration.yaml#services.tui.id", op: eq, value: tui}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.services", op: contains_all, value: [card_gate, scheduler, verifier, integrator, evidence_pack, release_bot]}
+      - {path: "standards/team-collaboration.yaml#flow.event_producers.test_weakening", op: contains, value: mechanism:verifier}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.handoff.team_side.2.by", op: contains, value: seat:test_author}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.handoff.team_side.2.by", op: not_contains, value: seat:planner}
+      - {path: "standards/context-assembly.yaml#memory.digest.producer", op: not_contains, value: delivery=planner}
     ct_refs: []

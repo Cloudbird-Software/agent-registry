@@ -35,6 +35,8 @@ escape_review:
        （下一波次 producer_gate 强制处置该提案：纳入即含回归测试验收）
     3: 按归因更新：spec_gap→规格模板/policy；test_gap→测试指引/mutation 阈值；impl_gap→TDD 流程；env_gap→环境契约
     4: 落 escape_found 事件（生产者=owner 经 interface-gateway，平台落事件；含归因+回溯链：缺陷→PR→卡→意图→验收示例）
+    5: 复发检测（ADR-0021）：同一归因的 escape 累计 >=2 次 → 升 systemic finding（policy_gap 类，severity=security）
+       强制入 owner 周审——同根因复发=防线系统性失效，不再按单次事故处理
   metrics: escape_rate by change_class & by 归因（metrics-aggregator 周报）
   note: escape_rate 比 mutation score 更贴近现实；它是 test-author/verifier 有效性的最终裁判
 
@@ -81,6 +83,8 @@ maintain_loop:
     - "deferred 条件到期自动重排 top-k（curator 机制扫描）——豁免也有保质期"
   maintenance_wave:                 # owner 不下新意图时的自救通道
     trigger: backlog 存在 security 级条目 OR aging 最老条目 > 30d（机器可判定；二者其一）
+    driver: mechanism:metrics-aggregator（每日聚合 aging/security 标注使 trigger 可判定；
+      机制被依赖即工作——ADR-0021：驱动源显式化，curator 周审消费其产出）
     executor: stewardship 提请（curator）→ delivery_squad 以 backlog 为波次范围组建
     acceptance: pre_approved（复绿即验收——intent-routing maintain；security 级升 owner_ratify）
   metrics: [backlog_aging_p50/p95, deferred_count, maintenance_wave_count]   # metrics-aggregator 周报
