@@ -10,6 +10,7 @@ gateway:
   auth: env:LLM_GATEWAY_KEY
   deployment_ref: "Cloudbird-Software/agent-registry deploy/llm-gateway"  # 本仓（ADR-0002 rev1）；validate 强制别名对齐
   upstream_runtime: {repo: openJiuwen-ai/jiuwenswarm, policy: deploy-time-pin}  # 上游官方镜像，不 fork 不 submodule
+  sdk_runtime: {repo: openJiuwen-ai/agent-core, policy: deploy-time-pin}        # 内核 SDK（openjiuwen）——双上游显式化（ADR-0025）；PyPI 钉版覆盖 git@develop
   strategies: [failover, quota-routing]   # 节点用量耗尽/不可达 → 自动切路由组内下一节点
 models:
   - alias: coder-fast

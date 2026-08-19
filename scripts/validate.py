@@ -681,6 +681,11 @@ if _up_repo:
     _repo_consumers.add(_up_repo)
     if _up_repo not in _proj_repos:
         fail(f"models.yaml gateway.upstream_runtime.repo '{_up_repo}' 不在 registry/projects.yaml（供应链漂移——ADR-0018）")
+_sdk_repo = (((load_yaml(REG / "models.yaml") or {}).get("gateway") or {}).get("sdk_runtime") or {}).get("repo")
+if _sdk_repo:  # ADR-0025：内核 SDK 双上游——与 upstream_runtime 同为 projects.yaml 消费者
+    _repo_consumers.add(_sdk_repo)
+    if _sdk_repo not in _proj_repos:
+        fail(f"models.yaml gateway.sdk_runtime.repo '{_sdk_repo}' 不在 registry/projects.yaml（供应链漂移——ADR-0018）")
 for _repo in sorted(_proj_repos - _repo_consumers):
     fail(f"projects.yaml 条目 {_repo} 无任何消费者（tool/gateway 皆未引用——死条目即漂移）")
 
