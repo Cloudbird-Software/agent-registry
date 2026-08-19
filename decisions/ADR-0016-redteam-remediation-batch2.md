@@ -49,3 +49,11 @@
 - 事件流可支撑 handoff/审批/凭据/预算审计——AR-6/AR-9 的审计支柱有了数据形状。
 - 代价：CI-Workflows 此后所有 PR 须引用 ADR（本就属 C1 声明，只是补上执行）；v1 发布流程多一步复核。
 - 红队二批不属实项以证据关闭，防"报告即事实"的修复冲动污染治理语义。
+
+## 附录：初始建仓导入直推豁免（GM-2 回填，2026-08-19）
+
+§8 直推检测上线即报警：`.github` 两个无关联 PR 的 commit（9b056b3a、416f5f5，消息"feat: GitHub 企业级安全与质量体系搭建"）。逐 SHA 复核（commits/{sha}/pulls API）确系直推，但性质是**初始建仓导入**——flows.new_repo step1-2（gh repo create + push 初始治理树）发生在 gate/PR 机制建立之前，彼时仓库本身尚不存在，初始 commit 结构上无法走 PR。同消息的 6a00fbf4 早于 policy_effective（2026-08-19T00:00Z），天然在检测窗外，无需豁免。
+
+**决策**：豁免采 GM-2 破玻璃回填的机器可读形式——`expected-state.json` 新增 `direct_push_exemptions` 字段，逐**完整 SHA** 登记（.github#56）；drift-check §8 命中豁免输出 OK 行注明依据。不引入时间窗/消息模式等弱判据——豁免范围被 SHA 唯一钉死，新直推 commit 不可能搭便车；豁免须有本 ADR 背书，不得口头/临时豁免。
+
+**边界**：豁免只认 SHA 精确匹配（grep -qF 全串），初始建仓导入之外的任何直推（含破玻璃操作本体）仍走 24h 回填时限报警。
