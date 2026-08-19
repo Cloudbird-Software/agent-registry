@@ -20,7 +20,8 @@
   C5 规则集声明自洽：main-protection 落盘 require_code_owner_review=false
      （SC-3 automerge 前提，ADR-0021）；required check=gate；codeql-gate 豁免 .github。
   C6 动作钉扎：各仓 workflow 的 actions 引用一律 40-hex SHA 锚定（组织自身
-     reusable workflow 引用允许 @vN 大版本指针——CI-Workflows 版本策略）。
+     reusable workflow 引用允许 @vN 大版本指针或"命中 vN tag 的 40-hex SHA"——
+     后者是 zizmor blanket 钉扎政策与 CI-Workflows 版本策略的调和形态）。
   C7 脚本防线在位：drift-check.sh 含 §8 直推/§9 admin 唯一/§10 ADR 实体性段落。
 
 用法：python3 scripts/canary.py  （退出码非 0 = 金丝雀死亡——治理流程测试回路红灯）
@@ -163,6 +164,30 @@ SHA_RE = re.compile(r"uses:\s*([^\s@]+)@([0-9a-f]{40})\s")
 TAGGED_RE = re.compile(r"uses:\s*([^\s@]+)@v[0-9]+\s")
 
 
+def ciw_version_tag_shas() -> set[str]:
+    """CI-Workflows 全部 vN 大版本 tag 指向的 commit SHA 集（含 annotated tag 解引用）。"""
+    shas: set[str] = set()
+    tags = fetch_json(f"{API}/repos/{ORG}/CI-Workflows/tags?per_page=100")
+    for t in tags:
+        name = t.get("name", "")
+        if not re.fullmatch(r"v[0-9]+", name):
+            continue
+        sha = t.get("commit", {}).get("sha", "")
+        try:
+            ref = fetch_json(f"{API}/repos/{ORG}/CI-Workflows/git/ref/tags/{name}")
+            obj = ref.get("object", {})
+            if obj.get("type") == "tag":  # annotated tag → 解引用到 commit
+                deref = fetch_json(f"{API}/repos/{ORG}/CI-Workflows/git/tags/{obj['sha']}")
+                sha = deref.get("object", {}).get("sha", sha)
+            else:
+                sha = obj.get("sha", sha)
+        except Exception:  # noqa: BLE001 —— ref 查询失败退回 tags 端口的 commit.sha
+            pass
+        if sha:
+            shas.add(sha)
+    return shas
+
+
 def check_c6() -> None:
     targets = {
         ".github": [".github/workflows/gate.yml", ".github/workflows/governance-drift.yml",
@@ -175,6 +200,8 @@ def check_c6() -> None:
         "agent-registry": [".github/workflows/validate.yml"],
     }
     uses_re = re.compile(r"uses:\s*(\S+)")
+    # 版本化 SHA 钉扎合法集：CI-Workflows vN tag 实际指向的 commit（懒加载一次）
+    tag_shas: set[str] = set()
     for repo, files in targets.items():
         for f in files:
             try:
@@ -186,8 +213,26 @@ def check_c6() -> None:
                 ref = m.group(1)
                 action, _, ver = ref.rpartition("@")
                 if action.startswith(f"{ORG}/CI-Workflows/"):
-                    if not re.fullmatch(r"v[0-9]+", ver):
-                        fail(f"C6: {repo}/{f} 组织 reusable workflow 引用 {ref} 非 @vN 版本指针")
+                    # 双合法形态（ADR-0021 zizmor 钉扎政策 × CI-Workflows 版本策略的调和）：
+                    # (a) @vN 大版本指针（版本策略既有形态）；
+                    # (b) 40-hex SHA 且命中某个 vN tag 指向的 commit——zizmor blanket 政策
+                    #     要求 SHA 钉扎（.github gate.yml hygiene 引用实证），版本语义由
+                    #     "SHA=已发布版本"保留，比 @vN 更强（不可变+可审计）。
+                    if re.fullmatch(r"v[0-9]+", ver):
+                        continue
+                    if re.fullmatch(r"[0-9a-f]{40}", ver):
+                        if not tag_shas:
+                            try:
+                                tag_shas = ciw_version_tag_shas()
+                            except Exception as e:  # noqa: BLE001
+                                fail(f"C6: CI-Workflows tag 清单拉取失败（fail-closed）: {e}")
+                                continue
+                        if ver in tag_shas:
+                            continue
+                        fail(f"C6: {repo}/{f} 组织 reusable workflow SHA 引用 {ref} 未命中任何 vN tag"
+                             "（版本化钉扎：SHA 必须等于已发布大版本指向的 commit）")
+                        continue
+                    fail(f"C6: {repo}/{f} 组织 reusable workflow 引用 {ref} 既非 @vN 也非版本化 40-hex SHA")
                     continue
                 if not re.fullmatch(r"[0-9a-f]{40}", ver):
                     fail(f"C6: {repo}/{f} action 引用 {ref} 未按 40-hex SHA 钉扎（ADR-0011 立场）")
