@@ -117,7 +117,7 @@ services:                            # 共享服务：跨队、按需实例化�
       （card.paused/resumed/aborted——flows#owner_control）
     owner_involvement: none（NL→intent 薄 LLM 层必须过 schema）
     availability: organization-level（不属任何单队——一切意图经此入境）
-  tui:                               # owner 直读视图与控制面板（ADR-0013 PR-B）
+  tui:                               # owner 直读视图与控制面板（ADR-0014 PR-B）
     kind: mechanism
     duty: 事件流→视图物化（六视图目录 observability.views）+ 控制动词入站转发
       （写事件非写状态——read_only 原则）
