@@ -159,3 +159,44 @@ scenarios:
       - {path: "standards/intent-routing.yaml#intents.deliver.acceptance_source", op: eq, value: new_ratable}
       - {path: "standards/intent-routing.yaml#intents.deliver.owner_sync", op: contains, value: synchronous}
     ct_refs: [CT-PLN-003]
+
+  # ── S18-S20 新场景（ADR-0018：上下文装配/记忆蒸馏/供应链——纯声明式）──────
+  S18-spawn-manifest:
+    class: regression
+    narrative: agent 实例化→编排层按 context-assembly 装配清单注入（identity 先于
+      任务载体）；judge 不装配 memory_view（判例唯一入口=case_law 只读）；
+      清单外注入=平台违规（check:spawn-manifest-conformance）
+    asserts:
+      - {path: "standards/context-assembly.yaml#rules.fail_closed", op: exists}
+      - {path: "standards/context-assembly.yaml#rules.order", op: contains, value: identity}
+      - {path: "standards/context-assembly.yaml#assembly.builder.components", op: contains_all, value: [identity, task_brief, tool_surface]}
+      - {path: "standards/context-assembly.yaml#assembly.judge.components", op: not_contains, value: memory_view}
+      - {path: "standards/context-assembly.yaml#memory.per_archetype.judge.types", op: eq, value: "[]"}
+      - {path: "standards/checks.yaml#checks", op: contains, value: spawn-manifest-conformance}
+    ct_refs: []
+  S19-memory-distill-before-destroy:
+    class: regression
+    narrative: ephemeral 队 handoff 相位导出 memory_digest 落数据层（先于 workspace
+      销毁；不随 30d 轨迹清理——curated 例外）→销毁后 curator 消费蒸馏——
+      素材不可能先于消费者消失（ADR-0004 断点收口）
+    asserts:
+      - {path: "standards/context-assembly.yaml#memory.digest.ordering_invariant", op: contains, value: 销毁}
+      - {path: "standards/context-assembly.yaml#memory.digest.schema", op: exists}
+      - {path: "standards/team-collaboration.yaml#artifacts.memory_digest", op: exists}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.handoff.team_side", op: contains, value: memory-export}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.handoff.stewardship_side", op: contains, value: memory-distill}
+      - {path: "registry/teams/dev-wave.yaml#lifecycle.handoff", op: contains, value: memory-export}
+      - {path: "registry/teams/incident-cell.yaml#lifecycle.handoff", op: contains, value: memory-export}
+    ct_refs: []
+  S20-supply-inventory:
+    class: regression
+    narrative: 工具/网关引用的开源项目必须先入 registry/projects.yaml（含 license/
+      pin_policy/audit）；CI 定时扫描（check:supply-audit）发现走 maintain_loop——
+      agent 体系自食其粮（dep 类防线对自己的基础设施同样成立）
+    asserts:
+      - {path: "registry/projects.yaml#projects", op: exists}
+      - {path: "registry/projects.yaml#audit_policy.tool", op: exists}
+      - {path: "registry/projects.yaml#audit_policy.routing", op: contains, value: maintain_loop}
+      - {path: "registry/tools/bash.yaml#implementation.repo", op: eq, value: openJiuwen-ai/jiuwenswarm}
+      - {path: "standards/checks.yaml#checks", op: contains, value: supply-audit}
+    ct_refs: []

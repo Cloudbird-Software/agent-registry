@@ -6,7 +6,7 @@ side_effects: [shell_sandbox, fs_write_sandbox]              # v2 词表（side-
 input: {schema_ref: schemas/bash-in.json}
 output: {schema_ref: schemas/bash-out.json}
 implementation:
-  repo: openJiuwen/jiuwenswarm           # 编排框架内置
+  repo: openJiuwen-ai/jiuwenswarm           # 编排框架内置（registry/projects.yaml 单一真源——org 名漂移修复，ADR-0018）
   path: builtin/bash
 status: approved
 owner: team:stewardship

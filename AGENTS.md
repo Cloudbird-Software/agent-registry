@@ -7,7 +7,9 @@
 - 禁止出现任何明文密钥/连接串；一律 `env:` 引用。
 - agent 只引用 models.yaml 中的 alias；模型接入必须经 LLM Gateway（ADR-0002）。
 - ephemeral team 必须声明 archive_to + handoff；销毁前移交必须完成（ADR-0004）。
-- 团队协作声明是可执行的：`scripts/simulate-wave.py` 是 CI required 门禁（场景注册表驱动，17 场景流程彩排，退出码非 0 拒绝合并——ADR-0011/ADR-0015）。
+- 团队协作声明是可执行的：`scripts/simulate-wave.py` 是 CI required 门禁（场景注册表驱动，20 场景流程彩排，退出码非 0 拒绝合并——ADR-0011/ADR-0015）。
+- agent 启动上下文只装配 `standards/context-assembly.yaml` 清单内组件；记忆不是规范来源；ephemeral 队销毁前必导出 memory_digest（ADR-0018）。
+- 工具实现与网关 upstream 引用的开源项目必须先入 `registry/projects.yaml`（供应链单一真源，ADR-0018）。
 - 场景注册表 `standards/scenarios.yaml` 是测试唯一真源：新场景先登记（纯声明式 asserts 优先），再跑模拟；hook 仅存量 S1–S12 保留。
 
 ## 索引（用到再读）
@@ -17,6 +19,8 @@
 | 声明一个 agent / skill / tool / team | 对应 schema：`.github/standards/agent/*.schema.yaml` |
 | 理解某原型的内部构成与职责保证 | [standards/archetype-profiles.yaml](standards/archetype-profiles.yaml) |
 | 理解团队/协作/卡与流/生效机制 | [standards/team-collaboration.yaml](standards/team-collaboration.yaml)（ADR-0011） |
+| agent 启动装配什么上下文/记忆如何管理 | [standards/context-assembly.yaml](standards/context-assembly.yaml)（ADR-0018） |
+| 引入开源项目/查供应链审计 | [registry/projects.yaml](registry/projects.yaml)（ADR-0018） |
 | owner 意图如何路由到载体（八分类+验收三分法） | [standards/intent-routing.yaml](standards/intent-routing.yaml)（ADR-0014） |
 | 变更走哪条通道（doc/trivial/spike/logic/…） | [standards/change-classes.yaml](standards/change-classes.yaml) |
 | owner 如何看状态/暂停/终止（TUI+控制动词） | [standards/observability.yaml](standards/observability.yaml)（ADR-0014） |
