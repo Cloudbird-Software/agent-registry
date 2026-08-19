@@ -179,9 +179,12 @@ teams:                               # 团队原型（team = seats 容器 + scop
       assemble_declares: owned_paths [glob...]；并发 squad 的 owned_paths 必须不相交，相交 → 拒组建或串行
     lifecycle:
       type: ephemeral
-      trigger: intent.received        # interface-gateway 结构化后即组队——planner 随队产验收示例；
-                                      # intent.ratified 是开卡前置（scheduler 前置检查），非组队前置
-                                      # （否则首波次 planner 无所属团队、预算无池可归属）
+      trigger: intent.received OR maintenance_wave.trigger   # 前者：interface-gateway 结构化后即组队
+                                      # ——planner 随队产验收示例；intent.ratified 是开卡前置
+                                      # （scheduler 前置检查），非组队前置（否则首波次 planner 无
+                                      # 所属团队、预算无池可归属）；后者：owner 无新意图时 curator
+                                      # 提请维护波次（flows#maintain_loop.maintenance_wave——backlog
+                                      # 即波次范围，interfaces.backlog.maintenance_trigger）
       archive_to: stewardship
       handoff:                        # 销毁前强制交接（每项有执行者——无主清单=队永不销毁）
         team_side:                    # 队侧（destroy 前，相位 handoff）
@@ -344,6 +347,8 @@ artifacts:                           # 制品=一切跨阶段/跨团队传递的
 
 interfaces:                          # 团队间接口（全部 artifact_mediated；读写权限见 channels.acl 唯一真源）
   backlog:                           # 治理→交付的回路（唯一需求入口；读写权限见 channels.acl）
+    entry_schema: registry/schemas/backlog-entry.json   # 条目字段契约（severity/created_at/defer_condition
+                                      # ——maintenance_wave.trigger 与 aging 指标的字段真源）
     flow: "proposals（多写者）→ curator 单写者归并排序 → merged；adversary 经 findings 由 curator 审核转化（不直写提案）"
     producer_gate: planner 组建波次必处置 top-k——每项 纳入/驳回+理由/延期+条件（条件须机器可判定）
     maintenance_trigger: owner 无新意图时 curator 提请 maintenance wave（触发条件

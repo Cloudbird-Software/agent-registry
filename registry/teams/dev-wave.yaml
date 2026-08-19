@@ -62,7 +62,9 @@ budget:
   invariants_ref: standards/team-collaboration.yaml#budget.invariants（升级通道永不冻结）
 lifecycle:
   type: ephemeral
-  trigger: intent.received        # 组队即 planner 入场产验收示例；intent.ratified=开卡前置（非组队前置）
+  trigger: intent.received OR maintenance_wave.trigger   # 前者：组队即 planner 入场产验收示例，
+                                    # intent.ratified=开卡前置（非组队前置）；后者：owner 无新意图时
+                                    # curator 提请维护波次（flows#maintain_loop——backlog 即波次范围）
   archive_to: team:stewardship
   handoff:                        # 执行者见 team-collaboration PART 2 delivery_squad.lifecycle.handoff
   - artifacts-pr                  #   team_side: mechanism:git / mechanism:metrics-aggregator / seat:test_author
