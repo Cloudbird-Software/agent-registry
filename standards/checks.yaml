@@ -44,9 +44,9 @@ checks:
     status: active
     where: C1 路径（standards/、decisions/、scripts/、.github/、CODEOWNERS、tests/）变更
       而 PR title/body 无 ADR-NNNN 引用、或被引 ADR 不在 PR head 的 decisions/
-      则 fail（agent-registry validate.yml + .github gate.yml 的 adr-required
-      步骤，ADR-0013 实装——CT-CUR-003 闭环；CODEOWNERS owner-only review
-      仍在，双防线）
+      则 fail（agent-registry validate.yml + .github gate.yml + CI-Workflows ci.yml
+      的 adr-required 步骤，ADR-0013 实装、ADR-0016 补 CI-Workflows 执行点——
+      CT-CUR-003 闭环；CODEOWNERS owner-only review 仍在，双防线）
 
   - id: rollback-plan-required
     status: active
