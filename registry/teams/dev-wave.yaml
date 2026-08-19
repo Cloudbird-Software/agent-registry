@@ -67,13 +67,16 @@ lifecycle:
                                     # curator 提请维护波次（flows#maintain_loop——backlog 即波次范围）
   archive_to: team:stewardship
   handoff:                        # 执行者见 team-collaboration PART 2 delivery_squad.lifecycle.handoff
-  - artifacts-pr                  #   team_side: mechanism:git / mechanism:metrics-aggregator / seat:planner+test_author
+  - artifacts-pr                  #   team_side: platform(git 带外) / mechanism:metrics-aggregator / seat:test_author
   - trace-archive
-  - memory-export                 #   memory_digest 导出（ADR-0018：素材先于 workspace 销毁过界）
+  - memory-export                 #   memory_digest 导出（ADR-0018：素材先于 workspace 销毁过界；
+                                    #   执行者=seat:test_author——handoff 相位唯一在场座位，ADR-0021）
   - retrospective
   - memory-distill                #   stewardship_side: curator 消费归档资产执行
   - adr-write
   destroy_policy: after-handoff
-  destroy_condition: released_behind_flag OR reverted   # 完整条件见 PART 2（destroy_scope：数据层制品不随队销毁）
+  destroy_condition: released_behind_flag OR reverted OR no_release_face(wave)
+                                    # 完整条件见 PART 2（no_release_face=全卡 doc/spike 无发布面——merge 即交接，ADR-0021；
+                                    #   destroy_scope：数据层制品不随队销毁）
 channels:
 - web

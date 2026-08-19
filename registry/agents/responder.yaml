@@ -24,7 +24,7 @@ permissions:
   overrides:
     - {tools: [tool:read_file], pattern: "re:.*prod.*secret.*", action: deny}   # CT-RSP-001 声明层配合（secret_read 不在 allow）
 credential:
-  github_app: cloudbird-agent
+  github_app: cloudbrid-agent
   secrets: [OPS_RUNBOOK_TOKEN]
 memory:
   types: [episodic]

@@ -23,6 +23,8 @@ classes:
       - 触及 tests/acceptance/** → 升 logic（强制 test_author review）
       - 跨模块（>1 模块目录）→ 升 logic
       - 验收不可自明（需构造示例才能说清"对"）→ 升 deliver（new_ratable）
+      - 同一意图 7d 内产出第 3 张 trivial 卡 → 升 logic（拆分绕过检测——scheduler 计数；
+        ADR-0021：语义复杂度测不准，但拆分行为可测）
   spike:                            # ADR-0014：investigate 意图的载体类（无合并面）
     scope: 调研/评估/选型——产认知不产代码（无合并面）
     card: required（卡=问题清单；验收=问题被证据回答）

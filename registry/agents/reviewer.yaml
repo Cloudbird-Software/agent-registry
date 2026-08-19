@@ -28,7 +28,7 @@ permissions:
     - {tools: [tool:write_file], pattern: "tests/unit/**", action: deny}   # unit 属 builder（设计工具）
     - {tools: [tool:write_file], pattern: "tests/acceptance/**", action: allow}
 credential:
-  github_app: cloudbird-agent
+  github_app: cloudbrid-agent
   secrets: []
 memory:
   types: [semantic]

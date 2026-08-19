@@ -87,7 +87,8 @@ memory:
     responder:   {types: [episodic], retention: 30d, note: 事故史}
   digest:                             # 交接链的素材契约（堵 ADR-0004 的断点）
     artifact: memory_digest           # 制品注册见 team-collaboration artifacts
-    producer: handoff 相位在场座位（delivery=planner+test_author；incident=responder）
+    producer: handoff 相位在场座位（delivery=test_author——planner 已于 cards.ratified 退场，
+      其规划经验经 cards/contracts 制品留存；incident=responder。ADR-0021 对齐 seats.present_in_phases）
     schema: schemas/memory-digest.json
     ordering_invariant: 导出先于 workspace 销毁；memory_digest 落数据层，
       不随 30d 轨迹清理（ADR-0003 的 curated 例外——原始轨迹可清，蒸馏素材永存）

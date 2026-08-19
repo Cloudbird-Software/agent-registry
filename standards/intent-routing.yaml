@@ -43,7 +43,9 @@ intents:
     flow_ref: "flows.yaml#intent_ratification（shortcut: self_evident）"
     note: 升级例外（路径规则自动升 logic，见 change-classes trivial）——触及 dep/schema/
       tests/acceptance/** 或跨模块即不再是 trivial；verifier 判卷不豁免（小修免检通道
-      一旦存在，"小"的定义必然膨胀——反仪式膨胀的对偶是例外膨胀）
+      一旦存在，"小"的定义必然膨胀——反仪式膨胀的对偶是例外膨胀）；
+      无在籍交付队时 → 直接入 backlog（curator 归并，随下个波次/维护波次处置，
+      不为单卡即时组队——ADR-0021：冷启动无队也有落点）
   respond:
     what: 生产事故响应
     examples: [告警（sev_alert 事件）, "生产挂了"]

@@ -31,7 +31,7 @@ guardrails:
     - "[ci] 回滚预案存在且可执行（check:rollback-plan-required）"
     - "[platform] 每动作 owner 放行记录落 incidents.* 事件"
 credential:
-  github_app: cloudbird-agent
+  github_app: cloudbrid-agent
   secrets: [PROD_DEPLOY_TOKEN]        # 经 environment 门禁放行（RL-1；CT-DEP-003）
 memory:
   types: [episodic]

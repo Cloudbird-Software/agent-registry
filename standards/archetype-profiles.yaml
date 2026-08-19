@@ -431,6 +431,14 @@ profiles:
     capabilities: {allow: [fs_read, vcs_read, datastore_read, datastore_write], agent_tools: {allow: [], max: 0}}
     structural_notes: 报告只进数据层+owner 周审；stewardship 消费处置（curator 无权阻止其运行）
 
+  tui:                              # owner 直读视图与控制面板（services.tui 的原型——ADR-0021 补齐）
+    kind: mechanism
+    implementation: 事件流只读投影（observability.views 六视图物化 + 控制动词转发）
+    mission: 可视化与控制入站——视图=确定性投影（read_only），控制动词=转发平台通道落事件（TUI 无数据层写凭据）
+    llm_assist: none
+    capabilities: {allow: [fs_read, datastore_read], agent_tools: {allow: [], max: 0}}
+    structural_notes: 事件流唯一事实源；写路径为零（read_only 原则——observability 同模式）
+
   # ════════════════════════ 伪原型（不实例化为 agent）════════════════════════
 
   owner:
