@@ -133,9 +133,71 @@ def event_has_producer(event_key):
     return False
 
 
+# ── L2 声明式断言求值器（ADR-0015：scenarios.yaml asserts 统一求值）────────
+def resolve_path(path):
+    """'standards/flows.yaml#owner_control.verbs.pause' → (doc, 值)。
+    键含 '.' 时用整段匹配（无引号场景）；路径段按 '/' 或 '.' 不分——键名不含点（约定）。"""
+    file_part, _, key_path = path.partition("#")
+    doc = load(ROOT / file_part)
+    cur = doc
+    for seg in key_path.split("."):
+        if cur is None:
+            return None
+        if isinstance(cur, list):
+            try:
+                cur = cur[int(seg)]
+            except (ValueError, IndexError):
+                cur = next((x for x in cur if isinstance(x, dict) and seg in str(x)), None)
+        elif isinstance(cur, dict):
+            if seg in cur:
+                cur = cur[seg]
+            elif seg.isdigit() and int(seg) in cur:   # YAML 数字键（steps.1 等）
+                cur = cur[int(seg)]
+            else:  # 键含点的兜底：合并相邻段找键
+                alt = f"{key_path}".split(".")
+                _joined = ".".join(alt[alt.index(seg):])
+                if _joined in cur:
+                    return cur[_joined]
+                return None
+        else:
+            return None
+    return cur
+
+
+def eval_assertion(a, ctx):
+    """求值一条声明式断言；失败返回错误消息，成功返回 None。"""
+    val = resolve_path(a["path"])
+    op, want = a.get("op"), a.get("value")
+    if op == "exists":
+        return None if val is not None else f"{a['path']} 不存在（应为存在）"
+    if val is None:
+        return f"{a['path']} 不存在（op={op} 需要值）"
+    s = val if isinstance(val, str) else str(val)
+    if op == "eq":
+        return None if s == str(want) else f"{a['path']}={s!r} != {want!r}"
+    if op == "contains":
+        return None if str(want) in s else f"{a['path']} 不含 {want!r}（实={s[:80]!r}）"
+    if op == "not_contains":
+        return None if str(want) not in s else f"{a['path']} 不应含 {want!r}"
+    if op == "contains_all":
+        missing = [w for w in want if str(w) not in s]
+        return None if not missing else f"{a['path']} 缺 {missing}（实={s[:80]!r}）"
+    return f"未知 op={op}"
+
+
+SCENARIOS = load(ROOT / "standards" / "scenarios.yaml").get("scenarios") or {}
+HOOKS = {}                      # 场景 id → 复杂语义断言函数（S1-S12 存量）
+
+
+def scenario_hook(fn):
+    HOOKS[fn.__name__] = fn
+    return fn
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # S1 正常波次：意图 → 交付 → 发布 → 交接 → 销毁（全相位走查）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_happy_path():
     name = "S1-happy-path"
     log(name, "意图: '给 template-service 加 /healthz 端点'")
@@ -262,6 +324,7 @@ def scenario_happy_path():
 # ══════════════════════════════════════════════════════════════════════════
 # S2 normative amendment 超时——默认动作必须是冻结而非 approve
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_amendment_timeout():
     name = "S2-amendment-timeout"
     log(name, "builder 发现卡歧义 → amendment_request(normative) → owner 未响应 24h")
@@ -288,6 +351,7 @@ def scenario_amendment_timeout():
 # ══════════════════════════════════════════════════════════════════════════
 # S3 sev1 事故，rollback_safe=false——半夜不毁数据（授权矩阵对齐词表+responder.allow）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_incident_unsafe_rollback():
     name = "S3-incident-unsafe-rollback"
     log(name, "sev1 告警 + release_record.rollback_safe=false + owner 睡觉")
@@ -331,6 +395,7 @@ def scenario_incident_unsafe_rollback():
 # ══════════════════════════════════════════════════════════════════════════
 # S4 升级预算耗尽——升级通道不被掐断
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_escalation_budget():
     name = "S4-escalation-budget"
     log(name, "builder↔test_author 僵持 + overhead_pool 已耗尽")
@@ -350,6 +415,7 @@ def scenario_escalation_budget():
 # ══════════════════════════════════════════════════════════════════════════
 # S5 judge 激活前缺席——路由不悬空；激活后实例可用（族独立+approved）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_judge_not_activated():
     name = "S5-judge-activation"
     log(name, "僵持首次发生（judge_service 未触发：累计<2）→ 激活（累计>=2）→ 实例化")
@@ -382,6 +448,7 @@ def scenario_judge_not_activated():
 # ══════════════════════════════════════════════════════════════════════════
 # S6 sev3 边界 + 事故单元可实例化（A1：实例与座位绑定真实存在）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_incident_instantiation():
     name = "S6-incident-instantiation"
     log(name, "sev3 走常规卡；sev1/sev2 事故单元实例化（座位绑定可用）")
@@ -408,6 +475,7 @@ def scenario_incident_instantiation():
 # ══════════════════════════════════════════════════════════════════════════
 # S7 backlog 回路——治理产出必须被消费（生产/消费双强制点）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_backlog_loop():
     name = "S7-backlog-loop"
     log(name, "escape review 产 backlog 提案 → curator 归并 → 下波次 planner 必须处置")
@@ -429,6 +497,7 @@ def scenario_backlog_loop():
 # ══════════════════════════════════════════════════════════════════════════
 # S8 gaming 检测——holdout 首开不循环依赖；tests/acceptance 规则不淹没通道
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_gaming_detection():
     name = "S8-gaming-detection"
     log(name, "builder PR 触及 tests/acceptance/**；holdout 失败但 visible 全绿（holdout 未激活→激活）")
@@ -456,6 +525,7 @@ def _extract_classes(s):
 # ══════════════════════════════════════════════════════════════════════════
 # S9 "测试写错了"修复路径——amendment.test_fix 可达，不依赖 planner 重入
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_test_fix_path():
     name = "S9-test-fix-path"
     log(name, "builder 主张'测试写错了' → amendment_request(test_fix) → test_author 修正（非减弱型 auto）")
@@ -477,6 +547,7 @@ def scenario_test_fix_path():
 # ══════════════════════════════════════════════════════════════════════════
 # S10 冷启动 + 事件完备性（A7）——状态机引用的一切事件有生产者
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_event_completeness():
     name = "S10-event-completeness"
     log(name, "遍历相位图事件 + 关键流事件 → 逐一断言有生产者（A7）")
@@ -499,6 +570,7 @@ def scenario_event_completeness():
 # ══════════════════════════════════════════════════════════════════════════
 # S11 信任链完整性——io_contract schema 存在；机制服务有原型（词表 fail-closed 全覆盖）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_trust_chain():
     name = "S11-trust-chain"
     log(name, "io_contract schema 实存；services 机制有原型注册（信任声明不缺位）")
@@ -535,6 +607,7 @@ def scenario_trust_chain():
 # ══════════════════════════════════════════════════════════════════════════
 # S12 跨生命周期——ephemeral 销毁后 stewardship 消费（无销毁依赖）
 # ══════════════════════════════════════════════════════════════════════════
+@scenario_hook
 def scenario_cross_lifecycle():
     name = "S12-cross-lifecycle"
     log(name, "dev-wave 销毁后 stewardship 消费 handoff 资产（原队 agent 已不存在）")
@@ -555,13 +628,32 @@ def scenario_cross_lifecycle():
 
 
 def run():
-    scenarios = (scenario_happy_path, scenario_amendment_timeout, scenario_incident_unsafe_rollback,
-                 scenario_escalation_budget, scenario_judge_not_activated, scenario_incident_instantiation,
-                 scenario_backlog_loop, scenario_gaming_detection, scenario_test_fix_path,
-                 scenario_event_completeness, scenario_trust_chain, scenario_cross_lifecycle)
-    for fn in scenarios:
-        trace.append(f"── {fn.__name__} " + "─" * 40)
-        fn()
+    # ADR-0015：场景注册表驱动——一切场景声明于 standards/scenarios.yaml。
+    # 每场景：声明式 asserts（引擎求值）+ hook（存量复杂语义断言，可选）。
+    if not SCENARIOS:
+        print("SIMULATION FAIL: standards/scenarios.yaml 场景注册表缺失或为空")
+        sys.exit(1)
+    declared = set(SCENARIOS)
+    hooked = set(HOOKS)
+    # 注册表与 hook 双向一致性（漂移=场景声明与实现脱节）
+    for sid in declared:
+        h = SCENARIOS[sid].get("hook")
+        if h and h not in hooked:
+            errors.append(f"REG: 场景 {sid} 声明 hook={h} 但实现不存在")
+    for h in hooked:
+        if h not in {SCENARIOS[s].get("hook") for s in declared}:
+            errors.append(f"REG: hook {h} 未在 scenarios.yaml 登记（场景注册表漂移）")
+    for sid, spec in SCENARIOS.items():
+        trace.append(f"── {sid} [{spec.get('class', '?')}] " + "─" * 30)
+        narrative = str(spec.get("narrative", "")).replace("\n", " ")
+        log(sid, narrative[:120])
+        for a in spec.get("asserts") or []:
+            msg = eval_assertion(a, sid)
+            if msg:
+                errors.append(f"L2[{sid}]: {msg}")
+        hook = spec.get("hook")
+        if hook:
+            HOOKS[hook]()
     print("\n".join(trace))
     print("─" * 72)
     if errors:
@@ -569,9 +661,13 @@ def run():
         for e in errors:
             print(f"  - {e}")
         sys.exit(1)
-    print(f"SIMULATION OK: {len(scenarios)} 场景全通（happy-path/amendment/unsafe-rollback/escalation-budget/"
-          "judge-activation/incident-instantiation/backlog-loop/gaming/test-fix/event-completeness/"
-          "trust-chain/cross-lifecycle）")
+    classes = {}
+    for spec in SCENARIOS.values():
+        c = spec.get("class", "?")
+        classes[c] = classes.get(c, 0) + 1
+    print(f"SIMULATION OK: {len(SCENARIOS)} 场景全通（{'/'.join(f'{k}×{v}' for k, v in classes.items())}"
+          f"；声明式断言 {sum(len(s.get('asserts') or []) for s in SCENARIOS.values())} 条 + hook 12 个——"
+          "场景注册表 standards/scenarios.yaml 驱动，ADR-0015）")
 
 
 if __name__ == "__main__":
