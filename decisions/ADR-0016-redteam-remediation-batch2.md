@@ -36,11 +36,11 @@
 
 1. **CI-Workflows adr-required 实装**：ci.yml gate job 增 adr-required 步骤（移植 .github gate.yml 同模型；C1 路径模式=\.github/、zizmor\.yml、README\.md——本仓现存的全部受管资产，新增受管路径须同步扩模式；--paginate 拉文件清单；词边界 ADR-NNNN 匹配；存在性由 .github drift-check §10 后验——不在 PR 上下文注入 org secret，zizmor secret-exposure 模型）。checks.yaml adr-required where 增 CI-Workflows 执行点。
 2. **zizmor 死配置清理**：删除 unpinned-uses ignore——现树零自引用，豁免无对象；未来未 pin uses 应当报错而非豁免。
-3. **v1 指针完整性检测**（drift-check 新 §11）：每日校验 `refs/tags/v1` 指向 commit == 最高 v1.x.y tag 指向 commit；不一致=漂移（admin 强移指针 24h 内检出）。README 版本策略同步改写：移动 v1 须在 PR 合并后由**另一只手**（另一个 session/终端）复核 tag 指向再推——发布流程从"备忘录"升级为"可检测不变式"。
-4. **event.schema v1.1**：事件枚举扩至 11 类——原 5 类 + handoff_step / approval / credential_used / budget_consumed / team_lifecycle / judge_verdict（payload 各入 $defs；requested/granted/denied 等子态并入 payload 枚举，避免顶层类型爆炸）；版本 $id @1.1（枚举只增不破，向后兼容）。
-5. **AR-6 措辞对齐**：team.schema handoff 描述与 GOVERNANCE AR-6 intent 改为"**team 侧** handoff 全部完成才允许销毁；stewardship 侧项由 curator 异步消费归档资产执行（destroy_scope：数据层制品/事件不随队销毁）"——与 team-collaboration.yaml 单一真源一致，消除假想死锁。
-6. **§10 ADR 实体性校验**：幽灵 ADR 检查从"文件名存在"升级为"存在且非空"——被引 ADR 文件 size < 阈值（1 字节即空文件）= 漂移。
-7. **漂移评论去重**：漂移指纹=报告全文 sha256（跨 run 稳定——同一漂移内容不变则指纹不变，run_id 仅作执行元数据随文附带）；开评论前比对最近 10 条评论的指纹标记，指纹已存在即跳过。幂等语义=漂移内容不变不重复报、漂移内容变化（新指纹）必报。
+3. **v1 指针完整性检测**（drift-check 新 §11）：每日校验 `refs/tags/v1` 指向 commit == 最高 v1.x.y tag 指向 commit；不一致=漂移（admin 强移指针 24h 内检出）。tag 清单**分页聚合**（单页截断会拿残缺集合比出假绿，任一页失败 fail-closed 拒用部分结果）；v1 为**必需指针**——被删缺失同样=漂移而非"不变式不适用"（v1 是全部业务仓 gate 的供应链入口）；v2+ 指针出现后自动纳入同一锚点/一致性校验。README 版本策略同步改写：移动 v1 须在 PR 合并后由**另一只手**（另一个 session/终端）复核 tag 指向再推——发布流程从"备忘录"升级为"可检测不变式"。
+4. **event.schema v1.1**：事件枚举扩至 11 类——原 5 类 + handoff_step / approval / credential_used / budget_consumed / team_lifecycle / judge_verdict（requested/granted/denied 等子态并入 payload 枚举，避免顶层类型爆炸）；版本 $id @1.1（枚举只增不破，向后兼容）。payload 按 event 类型经 allOf/if/then **强制绑定**对应 $def——六类新事件 payload 必填、各 def 带 required 与条件必填（status=failed→reason、ok=false→reason、pool=per_card→card、transition=destroyed→handoff_ref），空载荷不再合法；五类基础事件 payload 可缺省（v1 存量记录后兼容）；handoff_step.item 收敛为 team.schema lifecycle.handoff 同枚举（同步维护）。
+5. **AR-6 措辞对齐**：team.schema handoff 描述与 GOVERNANCE AR-6 intent 改为"**team 侧** handoff 全部完成才允许销毁；stewardship 侧项由 curator 异步消费归档资产执行（destroy_scope：数据层制品/事件不随队销毁）"——与 team-collaboration.yaml 单一真源一致，消除假想死锁。完成态审计双侧分离：run_finished.handoff_done 仅表达 team 侧销毁前置；stewardship 侧完成由 handoff_step(side=stewardship_side) 事件逐项留痕（单一布尔不承载双侧完成态）。
+6. **§10 ADR 实体性校验**：幽灵 ADR 检查从"文件名存在"升级为**内容结构校验**——被引 ADR 须 H1 编号行、status/状态 行、背景/决策章节齐备且决策节有正文，任一缺失=空壳=漂移（字节数阈值可被空白/注释/占位填充绕过，故弃用）；内容读取失败 fail-closed 判漂移；同名多文件任一满足即通过（ADR-0011 先例）；按编号缓存避免同批重复拉取。
+7. **漂移评论去重**：漂移指纹=**稳定漂移集合** sha256——只取报告 DRIFT 行、归一化回填时限秒数（=NNNs→<AGE>s）、排序去重后哈希（报告全文含每次运行都变的字段——直推存续秒数、检测窗口/commit 数——同一漂移会天天得到新指纹使去重失效；OK 行是健康度波动非漂移语义，不参与指纹）；run_id 仅作执行元数据随文附带。开评论前比对最近 10 条评论的指纹标记，指纹已存在即跳过。幂等语义=漂移集不变不重复报、漂移集变化（新增/消除/实质变化）必报。
 
 ## 后果
 
