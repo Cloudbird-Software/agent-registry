@@ -1,6 +1,10 @@
 name: gate  # ruleset required check 名为 gate（同 CI-Workflows 自测做法）
 on:
   pull_request:
+    # edited（qodo review #1，CI-Workflows #8 同款加固）：adr-required/standards-diff
+    # 消费可变的 PR title/body——不订阅 edited 则作者可在 check 通过后编辑掉
+    # ADR 引用而不触发重验；补引用救活 fail 的 check 同样依赖 edited 重触发
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -45,13 +49,37 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # --paginate（评审项）：只读首页时 >100 文件的 PR 会把 C1 变更漏检成 changed=false
-          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename')
-          if echo "$FILES" | grep -qE '^(standards/|decisions/|scripts/|\.github/|CODEOWNERS|tests/)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+          # 文件清单三防线（qodo review #2 #3 + 追加：换行文件名绕过）：
+          # 分页拉全量；rename 的 previous_filename 一并纳入 C1 判定（C1 资产改名
+          # 移出受管路径同样是 C1 变更）；files API 3000 文件硬上限 fail-closed。
+          # 计数与 C1 匹配全部在 jq 内按 JSON 对象处理——Git 允许文件名含换行，
+          # 行流（grep -c / echo|grep）会被单文件多行虚增计数绕过截断检测
+          # （qodo review：Newline filenames bypass truncation）。
+          PR_API="repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}"
+          CHANGED=$(gh api "$PR_API" --jq '.changed_files')
+          GOT=0
+          C1_HIT=0
+          PAGE=1
+          while :; do
+            PAGEJSON=$(gh api "$PR_API/files?per_page=100&page=$PAGE")
+            if ! jq -e 'type == "array"' <<<"$PAGEJSON" >/dev/null 2>&1; then
+              echo "::error::files API 第 $PAGE 页拉取失败——C1 判定完整性无法保证，fail-closed"
+              exit 1
+            fi
+            N=$(jq 'length' <<<"$PAGEJSON")
+            GOT=$((GOT+N))
+            if jq -e '[.[] | .filename, (.previous_filename // empty)]
+                     | any(test("^(standards/|decisions/|scripts/|\\.github/|CODEOWNERS|tests/)"))'                <<<"$PAGEJSON" >/dev/null 2>&1; then
+              C1_HIT=1
+            fi
+            [[ $N -lt 100 ]] && break
+            PAGE=$((PAGE+1))
+          done
+          if [ "$GOT" -lt "$CHANGED" ]; then
+            echo "::error::PR 声明变更 $CHANGED 个文件但 files API 只返回 $GOT 个（3000 上限截断）——C1 判定完整性无法保证，fail-closed"
+            exit 1
           fi
+          echo "changed=$([[ $C1_HIT -eq 1 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
       # adr-required（ADR-0013 实装，checks.yaml 转 active——CT-CUR-003 闭环）：
       # C1 路径变更的 PR，title/body 必须引用 ADR-NNNN 且被引 ADR 须存在于
       # PR head 的 decisions/（防"引用已在 main 被拒/未合入的幽灵 ADR"）。
