@@ -7,7 +7,8 @@
 - 禁止出现任何明文密钥/连接串；一律 `env:` 引用。
 - agent 只引用 models.yaml 中的 alias；模型接入必须经 LLM Gateway（ADR-0002）。
 - ephemeral team 必须声明 archive_to + handoff；销毁前移交必须完成（ADR-0004）。
-- 团队协作声明是可执行的：`scripts/simulate-wave.py` 是 CI required 门禁（12 场景流程彩排，退出码非 0 拒绝合并——ADR-0011）。
+- 团队协作声明是可执行的：`scripts/simulate-wave.py` 是 CI required 门禁（场景注册表驱动，17 场景流程彩排，退出码非 0 拒绝合并——ADR-0011/ADR-0015）。
+- 场景注册表 `standards/scenarios.yaml` 是测试唯一真源：新场景先登记（纯声明式 asserts 优先），再跑模拟；hook 仅存量 S1–S12 保留。
 
 ## 索引（用到再读）
 
@@ -16,6 +17,10 @@
 | 声明一个 agent / skill / tool / team | 对应 schema：`.github/standards/agent/*.schema.yaml` |
 | 理解某原型的内部构成与职责保证 | [standards/archetype-profiles.yaml](standards/archetype-profiles.yaml) |
 | 理解团队/协作/卡与流/生效机制 | [standards/team-collaboration.yaml](standards/team-collaboration.yaml)（ADR-0011） |
+| owner 意图如何路由到载体（八分类+验收三分法） | [standards/intent-routing.yaml](standards/intent-routing.yaml)（ADR-0014） |
+| 变更走哪条通道（doc/trivial/spike/logic/…） | [standards/change-classes.yaml](standards/change-classes.yaml) |
+| owner 如何看状态/暂停/终止（TUI+控制动词） | [standards/observability.yaml](standards/observability.yaml)（ADR-0014） |
+| 登记/复用流程测试场景 | [standards/scenarios.yaml](standards/scenarios.yaml)（ADR-0015） |
 | owner 注意力如何被预算 | [standards/attention-ledger.yaml](standards/attention-ledger.yaml) |
 | 写某个 agent 的提示词 | registry/identities/ 既有范本 |
 | 声明中引用 check:* 防线 | [standards/checks.yaml](standards/checks.yaml)（未登记=validate 拒绝，ADR-0012） |
