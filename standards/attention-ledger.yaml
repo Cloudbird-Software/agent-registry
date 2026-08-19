@@ -29,7 +29,8 @@ asynchronous:                         # 批量、可延迟、有默认动作
   - {item: test_weakening_approval, default_24h: "拒绝（判决树减弱默认冻结——验收范围缩水）",
      note: "test-author 特权变更：新卡+owner 批+test_weakening 事件（amendment.classify.test_fix.guard）"}
   - {item: dep_and_schema_owner_ratify, default_24h: "PR 保持挂起（默认不批——幻觉依赖/不可逆迁移是真实高频风险）",
-     note: "change-classes dep/schema 类 review: owner_ratify"}
+     note: "change-classes dep/schema 类 review: owner_ratify；maintain 回路 security 级条目升级同入此项
+            （flows#maintain_loop——security 修复多属 dep/schema 面；不新增账本条目，守恒）"}
   - {item: sev2_rollback_ack, default_60m: "rollback_safe ? deploy_reverse 预授权 : data_freeze",
      note: "incident_cell.authorization.sev2（ack 窗 60m；超时按条件默认——不空等）"}
   - {item: flag_enable_decision, default: "不开（flag 默认关=安全侧）",

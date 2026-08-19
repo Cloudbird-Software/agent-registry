@@ -95,7 +95,10 @@ owner_control:
         owner 暂停思考不应烧掉卡的时间预算）；usd 已花照记（沉没成本是真实的）
       target_states: [building, verify]   # 执行态才可暂停；drafting/ratified 本就未走表
       event: "card.paused（producer: owner 经平台通道——observability 同模式）"
-      resume: 回原相位，走表恢复；暂停时长记入卡时间线（trace 可见）
+    resume:                            # 顶层动词（与 observability.control_surface.verbs 三动词对齐）
+      semantics: 回原相位，走表恢复；暂停时长记入卡时间线（trace 可见）
+      target_states: [paused]           # 仅暂停态可恢复——回 pause 进入前的原相位
+      event: "card.resumed（producer: owner 经平台通道——observability 同模式）"
     abort:
       semantics: 不可逆终止；reason 必填（落事件——无 reason 的 abort 不可接受：
         组织的每个废动作都该有死因，否则 retro 无从归因）

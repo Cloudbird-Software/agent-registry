@@ -48,8 +48,8 @@ responder.allow 的集合比对）保留 hook（S1-S12 存量）；迁移到纯�
 - `runtime`：运行时执行方式 ∈ {adversary-executed(红队真试), validate-executed(校验器即
   执行), manual_only(须带 runtime_note 理由)}
 
-29 条 CT 全部链接完成：10 条 adversary-executed（带场景先决）、3 条 validate-executed、
-16 条 manual_only（每条带理由——多数是运行时凭据攻击面，模拟器测不到属诚实边界而非缺陷）。
+29 条 CT 全部链接完成：13 条 adversary-executed（带场景先决）、3 条 validate-executed、
+13 条 manual_only（每条带理由——多数是运行时凭据攻击面，模拟器测不到属诚实边界而非缺陷）。
 
 validate 双向校验：CT 引用的场景必须存在；scenario.ct_refs 引用的 CT 必须存在；
 manual_only 无理由=CI 拒绝。
@@ -69,7 +69,7 @@ hook 不存在/实现未登记=漂移=FAIL）；输出按 class 统计。**新�
 
 - 场景可 diff 可 review 可 PR——流程变更破坏可执行性时 CI 精确指出哪条断言红了
 - "测试底层方法统一"落地：L1 原语 + L2 声明剧本 + L3 门禁，无第二套方法
-- CT 从手册变半机器：声明层先决自动跑，运行时部分显式分类（16 条 manual_only 的理由
+- CT 从手册变半机器：声明层先决自动跑，运行时部分显式分类（13 条 manual_only 的理由
   本身就是攻击面清单——待自动化时逐条消灭）
 - 代价：S1-S12 断言仍在 Python（hook）——声明化不彻底；迁移是增量工作，每迁一个
   场景断言数可数（当前声明式 30 条 + hook 12 个）

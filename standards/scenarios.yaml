@@ -128,6 +128,9 @@ scenarios:
       - {path: "standards/flows.yaml#maintain_loop.maintenance_wave.trigger", op: contains, value: 30d}
       - {path: "standards/flows.yaml#maintain_loop.maintenance_wave.executor", op: contains, value: curator}
       - {path: "standards/flows.yaml#maintain_loop.maintenance_wave.acceptance", op: contains, value: pre_approved}
+      - {path: "standards/team-collaboration.yaml#teams.delivery_squad.lifecycle.trigger", op: contains, value: maintenance_wave.trigger}
+      - {path: "registry/teams/dev-wave.yaml#lifecycle.trigger", op: contains, value: maintenance_wave.trigger}
+      - {path: "standards/team-collaboration.yaml#interfaces.backlog.entry_schema", op: exists}
     ct_refs: []
   S16-owner-control:
     class: regression
@@ -141,6 +144,8 @@ scenarios:
       - {path: "standards/team-collaboration.yaml#flow.event_producers.card.paused", op: exists}
       - {path: "standards/team-collaboration.yaml#flow.event_producers.card.aborted", op: exists}
       - {path: "standards/observability.yaml#control_surface.verbs", op: contains_all, value: [pause, resume, abort]}
+      - {path: "standards/flows.yaml#owner_control.verbs", op: contains_all, value: [pause, resume, abort]}
+      - {path: "standards/flows.yaml#owner_control.verbs.resume.event", op: contains, value: card.resumed}
     ct_refs: []
   S17-unratified-intent-blocked:
     class: control
