@@ -24,9 +24,9 @@ audit_policy:
   check: check:supply-audit
 projects:
   - repo: openJiuwen-ai/jiuwenswarm
-    role: 编排框架 upstream（官方镜像，不 fork 不 submodule）
-    license: unverified            # 首审回填——supply-audit 首跑动作即补全并钉扎
-    pin_policy: deploy-time-pin    # 与 models.yaml upstream_runtime.policy 同源
+    role: 编排框架 upstream（官方镜像，不 fork 不 submodule；落地载体=Cloudbird-Software/swarm-factory，见 ADR-0023）
+    license: Apache-2.0            # 首审回填（ADR-0023）：证据=上游 LICENSE 文件 + pyproject license 声明
+    pin_policy: deploy-time-pin    # 与 models.yaml upstream_runtime.policy 同源（当前钉 0.2.3 / tag release_0.2.3）
     audit: {tool: osv-scanner, schedule: weekly}
   - repo: Cloudbird-Software/agent-tools
     role: 组织工具集（gitcode-pr 等自有工具宿主）
