@@ -13,6 +13,8 @@ FastAPI + PostgreSQL 16，2026-07 建仓，先于组织治理基线成形）。�
 1. `governance/expected-state.json` repo_baseline.exclude_repos（BP-4 仓库基线不适用）
 2. `governance/rulesets/main-protection.json` repository_name.exclude（BP-1/BP-2 不适用）
 3. `governance/rulesets/codeql-gate.json` repository_name.exclude（SC-1 不适用）
+4. `governance/rulesets/release-tags.json` repository_name.exclude（BP-3 不适用）
+   （勘误 2026-08-19：初版漏列本条，经 .github PR #76 机器人评审发现后补入）
 
 豁免的直接代价已经发生：2026-08-19 PR #31 在 pr-check **未通过**（7 个单测失败：
 response_event 按月分区 vs 测试硬编码历史日期的跨月时间炸弹）的状态下被合入 main
@@ -27,8 +29,8 @@ projects 关 / public），CodeQL default setup 已于 2026-08-18 启用，admin
 
 1. **解除全部豁免，转入 active**：
    - expected-state.json repo_baseline.exclude_repos 置空；
-   - main-protection.json / codeql-gate.json 的 repository_name.exclude 移除
-     AI_Web_School（codeql-gate 保留 .github 自身豁免不变）；
+   - main-protection.json / codeql-gate.json / release-tags.json 的
+     repository_name.exclude 移除 AI_Web_School（codeql-gate 保留 .github 自身豁免不变）；
    - GOVERNANCE.yaml BP-1 的 exception 字段移除；
    - REPOS.yaml 中 AI_Web_School `status: exempt → active`，角色描述更新为
      已接入治理面的产品仓。合并后按 GM-2 流程跑 apply.sh 落地 ruleset 变更。
