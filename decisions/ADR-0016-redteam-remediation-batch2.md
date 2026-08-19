@@ -40,7 +40,7 @@
 4. **event.schema v1.1**：事件枚举扩至 11 类——原 5 类 + handoff_step / approval / credential_used / budget_consumed / team_lifecycle / judge_verdict（requested/granted/denied 等子态并入 payload 枚举，避免顶层类型爆炸）；版本 $id @1.1（枚举只增不破，向后兼容）。payload 按 event 类型经 allOf/if/then **强制绑定**对应 $def——六类新事件 payload 必填、各 def 带 required 与条件必填（status=failed→reason、ok=false→reason、pool=per_card→card、transition=destroyed→handoff_ref），空载荷不再合法；五类基础事件 payload 可缺省（v1 存量记录后兼容）；handoff_step.item 收敛为 team.schema lifecycle.handoff 同枚举（同步维护）。
 5. **AR-6 措辞对齐**：team.schema handoff 描述与 GOVERNANCE AR-6 intent 改为"**team 侧** handoff 全部完成才允许销毁；stewardship 侧项由 curator 异步消费归档资产执行（destroy_scope：数据层制品/事件不随队销毁）"——与 team-collaboration.yaml 单一真源一致，消除假想死锁。完成态审计双侧分离：run_finished.handoff_done 仅表达 team 侧销毁前置；stewardship 侧完成由 handoff_step(side=stewardship_side) 事件逐项留痕（单一布尔不承载双侧完成态）。
 6. **§10 ADR 实体性校验**：幽灵 ADR 检查从"文件名存在"升级为**内容结构校验**——被引 ADR 须 H1 编号行、status/状态 行、背景/决策章节齐备且决策节有正文，任一缺失=空壳=漂移（字节数阈值可被空白/注释/占位填充绕过，故弃用）；内容读取失败 fail-closed 判漂移；同名多文件任一满足即通过（ADR-0011 先例）；按编号缓存避免同批重复拉取。
-7. **漂移评论去重**：漂移指纹=**稳定漂移集合** sha256——只取报告 DRIFT 行、归一化回填时限秒数（=NNNs→<AGE>s）、排序去重后哈希（报告全文含每次运行都变的字段——直推存续秒数、检测窗口/commit 数——同一漂移会天天得到新指纹使去重失效；OK 行是健康度波动非漂移语义，不参与指纹）；run_id 仅作执行元数据随文附带。开评论前比对最近 10 条评论的指纹标记，指纹已存在即跳过。幂等语义=漂移集不变不重复报、漂移集变化（新增/消除/实质变化）必报。
+7. **漂移评论去重**：漂移指纹=**稳定漂移集合** sha256——只取报告 DRIFT 行、归一化回填时限秒数（=NNNs→<AGE>s）、排序去重后哈希（报告全文含每次运行都变的字段——直推存续秒数、检测窗口/commit 数——同一漂移会天天得到新指纹使去重失效；OK 行是健康度波动非漂移语义，不参与指纹）；run_id 仅作执行元数据随文附带。开评论前比对**该 issue 全部评论**的指纹标记（只看最近 N 条时，同一指纹在更早自动评论里会被重复发布），指纹已存在即跳过；workflow 级 concurrency 串行化使"查指纹→写评论"原子化（并发运行排队而非同时写）。幂等语义=漂移集不变不重复报、漂移集变化（新增/消除/实质变化）必报。
 
 ## 后果
 
