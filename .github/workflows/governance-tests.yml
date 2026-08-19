@@ -1,0 +1,76 @@
+name: governance-tests
+# 治理测试回路（ADR-0021 决策 9）：canary / 差分 / 回归三类方法周期性验证
+# "仓库定义的治理流程本身"没有问题。全部测试消费声明式定义：
+#   回归   = validate.py（结构不变式）+ simulate-wave.py（24 场景相位机彩排）
+#            + pytest 元测试（负向注入差分——注入缺陷必须被拒绝）
+#   差分   = snapshot.py --check（声明面 vs golden 的逐 PR 语义差分——
+#            声明变更必须显式更新 golden，评审看到完整语义影响面）
+#   canary = canary.py（四仓公开治理面不变量探测，零凭据，fail-closed）
+# PR 只跑回归+差分（快、离线）；canary 在 schedule/push main/dispatch 跑
+#（周期值 = 独立于 PR 上下文的第三方视角：线上公开面被意外改动时按日告警）。
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *" # 每日 03:00 UTC（避开整点 drift-check 高峰）
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: governance-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml pytest
+      - name: validate（结构不变式）
+        run: python3 scripts/validate.py
+      - name: simulate（24 场景相位机彩排）
+        run: python3 scripts/simulate-wave.py
+      - name: meta-validate（负向注入差分）
+        run: python -m pytest tests/ -v
+
+  snapshot-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: 声明面差分（vs golden）
+        run: python3 scripts/snapshot.py --check
+
+  canary:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}   # 零凭据设计：只读公开仓 raw/api，不挂任何 token
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: canary（四仓公开治理面不变量）
+        run: python3 scripts/canary.py
