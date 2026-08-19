@@ -85,7 +85,7 @@ maintain_loop:
     acceptance: pre_approved（复绿即验收——intent-routing maintain；security 级升 owner_ratify）
   metrics: [backlog_aging_p50/p95, deferred_count, maintenance_wave_count]   # metrics-aggregator 周报
 
-# ---- G. owner 控制（ADR-0013 PR-B：任务暂停/终止——控制动词=事件不是凭据）----
+# ---- G. owner 控制（ADR-0014 PR-B：任务暂停/终止——控制动词=事件不是凭据）----
 owner_control:
   entry: TUI 控制面板 / interface-gateway（observability.control_surface——同一入口）
   scope: 卡级（波级冻结已有 wave.frozen——scheduler 预算熔断；owner 控制不重复波级）
