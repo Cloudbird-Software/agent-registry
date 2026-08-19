@@ -112,9 +112,18 @@ seats:                               # 座位：占实体成员位（= archetype
 services:                            # 共享服务：跨队、按需实例化、不占团队成员位
   interface_gateway:                 # 组织级意图入口（常驻——archetype-profiles 机制原型实例）
     kind: mechanism
-    duty: 人类输入→脱敏→intent schema 校验→路由（新工作→planner；在途→scheduler）
+    duty: 人类输入→脱敏→intent schema 校验→路由（新工作→planner；在途→scheduler）；
+      ask 意图检索路由（observability.ask_retrieval）；owner 控制动词入站
+      （card.paused/resumed/aborted——flows#owner_control）
     owner_involvement: none（NL→intent 薄 LLM 层必须过 schema）
     availability: organization-level（不属任何单队——一切意图经此入境）
+  tui:                               # owner 直读视图与控制面板（ADR-0014 PR-B）
+    kind: mechanism
+    duty: 事件流→视图物化（六视图目录 observability.views）+ 控制动词入站转发
+      （写事件非写状态——read_only 原则）
+    data_source: 事件流唯一事实源（与 ask_retrieval 同源同投影——回答一致性由结构保证）
+    owner_involvement: none（视图物化是确定性投影，无判断位）
+    availability: organization-level（常驻；stewardship channels 已声明 tui）
   card_gate:                         # 卡批准=机制输出（不是人的动作，不是 planner 自批）
     kind: mechanism
     output_event: cards.ratified
@@ -259,6 +268,9 @@ flow:                                # 波次相位状态机（simulate-wave.py 
     pr.merged:                  platform（git 事件带外——builder 退场条件）
     wave.frozen:                mechanism:scheduler（预算熔断/整波冻结——builder 退场条件）
     incident.sev_alert:         platform（告警接入带外——incident_cell 组队事件）
+    card.paused:                owner（经 TUI/interface-gateway 平台通道——flows#owner_control）
+    card.resumed:               owner（经平台通道——同上）
+    card.aborted:               owner（经平台通道——reason 必填，reason_routing 决定善后）
   verdict_layers:                    # 三层判决（review≠判卷——判卷是 verifier 机制）
     gate:        {type: mechanism, covers: "CI/holdout/mutation/contract_conformance", output: pass/fail+evidence}
     review:      {type: seat(test_author), question: "实现是否满足卡意图（不只是过测试）",
@@ -281,8 +293,14 @@ artifacts:                           # 制品=一切跨阶段/跨团队传递的
       rule: 对机制检索的每个候选 ADR/skill 逐项 applies / not_applicable(理由)
       forbidden: planner 自行声明"无相关 ADR"（自证不存在=仪式化入口）
     lifecycle:                       # 卡的生命周期（amendment 并入此处，不再独立成节）
-      states: [drafting, testability_review, ratified, building, verify, merged, archived]
+      states: [drafting, testability_review, ratified, building, verify, paused, merged,
+               archived, aborted]
+      # paused=owner 暂停（building/verify 进入，resume 回原相位——语义 flows.yaml#owner_control）
+      # aborted=owner 终止终态（reason 必填，reason_routing 决定善后）
       ratified_by: "service:card_gate（见 PART 2——机制输出）"
+      owner_control_ref: flows.yaml#owner_control（暂停/终止语义单一真源——此
+        处仅列状态；控制动词=事件（card.paused/card.resumed/card.aborted），owner
+        经平台通道落事件，TUI 无数据层写凭据）
       amendment:
         initiator: [builder, test_author]              # amendment_request 为 artifact（见下 amendment_request），非消息
         forbidden: builder 直写 card 任何字段
