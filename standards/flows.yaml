@@ -15,6 +15,16 @@ intent_ratification:
   acceptance_digest:
     rule: "波次完成时产出一屏证据包（curl 记录/截图/golden diff/verdict 逐条对照已批示例）——不是只给 verdict:pass"
     why: "owner 的注意力应花在『这是我想要的吗』，不是『测试绿了吗』"
+  shortcuts:                        # ADR-0014：验收三分法——不是一切意图都走全流程
+    self_evident:                   # fix/trivial：意图原文即验收（"错在哪即对在哪"）
+      rule: 卡=意图原文；不经示例批准（intent-routing.intents.fix）
+      guard: 升级例外照常（change-classes.trivial.promote_if——路径规则机制判定）
+    pre_approved:                   # maintain：当年批准检查=预批未来复绿
+      rule: drift 绿 / CT 过 / 版本升即验收，无交互（intent-routing.intents.maintain）
+      guard: 预批准不可迁移到新验收面（drift 复绿预批的是"回到期望状态"，不是"期望状态改变"）
+    evidence_based:                 # investigate/spike：问题被证据回答即合格
+      rule: 产出 ADR/finding schema 校验通过（intent-routing.intents.investigate）
+      guard: 结论必须附引用（禁无证据断言——findings.json sources minItems:1）
 
 # ---- B. 现实反馈：escape 闭环（唯一能真实评价验证体系的指标）----
 escape_review:
@@ -55,3 +65,22 @@ incident:
     - 恢复类动作先做后报（async_notify），全留痕
     - 白名单外动作只能上报 owner
     - 24h 内补事件详情与 retro；curator 追踪逾期债（CT-RSP-002）
+
+# ---- F. 维护回路（ADR-0014：周扫发现→修复，无人手动启动 agent）----
+maintain_loop:
+  problem: 周扫（drift-check/CT/dependabot/scorecard）产 issue 后，若靠 owner 记得手动
+    起人修——issue 会躺在列表里腐烂；维护是系统的代谢，不是人的待办
+  issue_lifecycle:                  # issue 是 backlog 的前端展示，不是独立队列
+    open: 扫描器自动开（含指标/证据/期望状态引用）
+    triage: curator 周审转 backlog.proposals（多写者→单写者归并；severity 标注）
+    consumed: planner 组波次 producer_gate 必处置 top-k（纳入/驳回+理由/延期+条件）
+    closed: 修复 PR 关 issue + 复绿证据（check 复跑通过）——无复绿证据不得关
+    deferred: 唯一豁免出口——必须带机器可判定条件 + 理由；aging 指标可见（见下）
+  invariants:
+    - "issue 不可能『躺在列表里』：要么被消费、要么被显式驳回（留理由）、要么 deferred（带条件）——三选一强制，无第四态"
+    - "deferred 条件到期自动重排 top-k（curator 机制扫描）——豁免也有保质期"
+  maintenance_wave:                 # owner 不下新意图时的自救通道
+    trigger: backlog 存在 security 级条目 OR aging 最老条目 > 30d（机器可判定；二者其一）
+    executor: stewardship 提请（curator）→ delivery_squad 以 backlog 为波次范围组建
+    acceptance: pre_approved（复绿即验收——intent-routing maintain；security 级升 owner_ratify）
+  metrics: [backlog_aging_p50/p95, deferred_count, maintenance_wave_count]   # metrics-aggregator 周报
