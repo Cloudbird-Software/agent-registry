@@ -1,14 +1,17 @@
-version: 1.0
+version: 1.1
 # ============================================================================
 # Attention Ledger —— owner 注意力账本（可校验）
 # team-collaboration.yaml PART 4 的引用文件；validate.py 断言：
-#   ① synchronous 数 <= max_synchronous_per_week（conservation_rule 的硬表达）
+#   ① synchronous 类目数 <= max_synchronous_categories（conservation_rule 的硬表达）
 #   ② 每一项都有 default（或显式 no_default_justified 且理由可逆性成立）
 #   ③ 默认动作符合 default_action 原则（撤销代价更小侧；抽样审计人工复核）
-# 新增 owner-blocking 点必须同时移除一个——改本文件走 registry PR（owner-only）。
+# 新增 owner-blocking 类目必须同时移除一个——改本文件走 registry PR（owner-only）。
+# 语义（ADR-0022 对齐 issue #31 D-4）：静态层守恒的是【类目数】——每周实际交互
+# 次数由类目语义界定（intent_ratification 每意图 ≤1 次、sev1 授权每事故 ≤1 次），
+# 运行时频次由 metrics-aggregator 计数（attention_interaction_rate 周报）可审计。
 # ============================================================================
 
-max_synchronous_per_week: 2          # 硬断言（validate 检查；超标=设计缺陷不是运营参数）
+max_synchronous_categories: 2       # 硬断言（validate 检查；超标=设计缺陷不是运营参数）
 
 synchronous:                          # 必须人在场（穷举；增删必改本文件）
   - item: intent_ratification         # 波次级验收示例批准——不可委派（non_delegable）

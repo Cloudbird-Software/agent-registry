@@ -23,6 +23,10 @@ permissions:
   overrides:
     - {tools: [tool:gitcode-pr], pattern: "re:.*((ruleset)|(secret)|(CODEOWNERS)|(/settings/)).*", action: deny}   # 无 vcs_admin（CT-CUR-001）
     - {tools: [tool:bash], pattern: "gh api *rulesets*", action: deny}
+    - {tools: [tool:write_file], pattern: "standards/**", action: deny}       # "只有提案权"的 registry 层表达
+    - {tools: [tool:write_file], pattern: "scripts/validate.py", action: deny}   # （identities/curator-main.md——
+    - {tools: [tool:write_file], pattern: "CODEOWNERS", action: deny}          # 直写被拒，变更走 PR+owner 批，
+                                                                                # ADR-0022 修复 issue #31 B-6）
 memory:
   types: [semantic]
   retention: 365d

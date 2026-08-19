@@ -14,6 +14,7 @@ v2 要点（对照 v1）：
 
 退出码非 0 = CI 拒绝。对应 GOVERNANCE AR-2 / AR-6。
 """
+import json
 import os
 import re
 import sys
@@ -78,18 +79,40 @@ VOCAB = set()
 _se = load_yaml(ROOT / "standards" / "side-effects.yaml") or {}
 for _grp in (_se.get("groups") or {}).values():
     VOCAB.update(_grp.keys())
+# ── 执行通道词表（ADR-0022——issue #31 收敛判据 9）：每个副作用词必居一通道 ──
+_dc = (_se.get("delivery_channels") or {})
+_TOOL_REQ = set(_dc.get("tool_required") or [])
+_ALL_CHANNELS = _TOOL_REQ | set(_dc.get("platform_direct") or []) | set(_dc.get("runtime_builtin") or [])
+_unchanneled = VOCAB - _ALL_CHANNELS
+if _unchanneled:
+    fail(f"side-effects: delivery_channels 未覆盖词表 {sorted(_unchanneled)}（词无通道=执行面不可判，ADR-0022）")
 CT_REG = (load_yaml(ROOT / "standards" / "control-tests.yaml") or {}).get("tests", {})
+# checks 注册表提前加载（ADR-0022：must_run 的 check: 引用校验需要 id 集）；
+# 根类型校验（评审项）：列表/标量根须报结构错误而非崩溃
+CHECKS_REG = load_yaml(ROOT / "standards" / "checks.yaml") or {}
+if not isinstance(CHECKS_REG, dict):
+    fail(f"checks.yaml 根节点须为对象（version/checks），实为 {type(CHECKS_REG).__name__}")
+    CHECKS_REG = {}
+elif not isinstance(CHECKS_REG.get("checks"), list):
+    fail(f"checks.yaml 的 checks 须为列表，实为 {type(CHECKS_REG.get('checks')).__name__}")
+    CHECKS_REG["checks"] = []
+_CHECKS_LOADED = {_c.get("id") for _c in CHECKS_REG.get("checks", []) or [] if isinstance(_c, dict)}
 # 标准文件可解析性（flows/change-classes 暂无结构校验，先保证解析不失败——CodeRabbit #5）
 for _std in ("flows.yaml", "change-classes.yaml", "team-collaboration.yaml", "attention-ledger.yaml"):
     if (load_yaml(ROOT / "standards" / _std) or {}) == {}:
         fail(f"standards/{_std} 缺失或解析为空（标准文件必须可解析，ADR-0010）")
 
 # attention-ledger 断言（team-collaboration v1.0：conservation_rule 的硬表达）
+# ADR-0022（issue #31 D-4）：守恒的是【类目数】——键名 max_synchronous_categories；
+# 每周实际频次由类目语义界定并在 metrics 周报可审计（运行时数据，静态层不伪校验）
 _LEDGER = load_yaml(ROOT / "standards" / "attention-ledger.yaml") or {}
 _sync = _LEDGER.get("synchronous") or []
-_max = _LEDGER.get("max_synchronous_per_week")
+_max = _LEDGER.get("max_synchronous_categories")
+if _max is None and _LEDGER.get("max_synchronous_per_week") is not None:
+    fail("attention-ledger: max_synchronous_per_week 已更名 max_synchronous_categories"
+         "（静态层守恒类目数——ADR-0022 语义对齐 issue #31 D-4）")
 if _max is not None and len(_sync) > _max:
-    fail(f"attention-ledger: synchronous 阻塞点 {len(_sync)} 个 > 上限 {_max}（conservation_rule 违反——新增必须移除一个）")
+    fail(f"attention-ledger: synchronous 阻塞类目 {len(_sync)} 个 > 上限 {_max}（conservation_rule 违反——新增必须移除一个）")
 for _entry in _sync:
     if isinstance(_entry, dict) and not (_entry.get("default") or _entry.get("why_blocking")):
         fail(f"attention-ledger: synchronous 项 {_entry.get('item')} 缺 default 且缺 why_blocking（人在环点必须有确定行为或不可默认理由）")
@@ -106,16 +129,87 @@ if _graph and _order:
     for _ph in _order:
         if _ph in _terminal:
             continue
-        if not any(str(e.get("from")) in (_ph, "any") and e.get("when") is not None for e in _graph):
-            fail(f"team-collaboration: phase '{_ph}' 无出边（死锁相位）")
+        # ADR-0022（issue #31 A-4）：any 通配边不计为具体相位的出边——旧实现
+        # `str(e.get("from")) in (_ph, "any")` 因永久存在的 any 边而对任意相位恒真
+        if not any(str(e.get("from")) == _ph and e.get("when") is not None for e in _graph):
+            fail(f"team-collaboration: phase '{_ph}' 无专属出边（死锁相位——any 通配边不计，ADR-0022）")
 
 # 相位图事件的生产者完整性（flow.event_producers——悬空事件=状态机不可执行）
 _evt_prod = (_TC.get("flow") or {}).get("event_producers") or {}
 for _e in _graph:
     for _tok in str(_e.get("when", "")).replace("AND", " ").replace("OR", " ").split():
-        _k = _tok.rstrip(")").split("(")[0].strip()
+        _k = _tok.strip("() \t")            # ADR-0022：剥离括号（OR 分支的 "(review.approve" 形态）
         if _k and "." in _k and _k not in _evt_prod and not _k.startswith(("planner", "builder", "wave")):
             fail(f"team-collaboration: 相位边事件 '{_k}' 无生产者（flow.event_producers 缺项）")
+
+# ── 生产者引用解析（ADR-0022：issue #31 变异 F——seat:/agent: 悬空引用灭绝）──
+_SEATS_DEF = set((_TC.get("seats") or {}).get("present_in_phases") or {})
+for _e, _p in _evt_prod.items():
+    _ps = str(_p)
+    for _ref in re.findall(r"seat:([A-Za-z0-9_-]+)", _ps):
+        if _ref not in _SEATS_DEF:
+            fail(f"team-collaboration: 事件 '{_e}' 生产者 seat:{_ref} 不在 seats.present_in_phases（悬空座位——ADR-0022）")
+    for _ref in re.findall(r"agent:([A-Za-z0-9_-]+)", _ps):
+        if _ref not in agents:
+            fail(f"team-collaboration: 事件 '{_e}' 生产者 agent:{_ref} 不存在（悬空引用——ADR-0022）")
+
+# ── per-change_class 相位可达性（ADR-0022：issue #31 C-1——分类死锁灭绝）──
+# review 裁定按 dispatch 表分派；事件可用性=基础集（platform/机制/owner 生产，排除
+# review.*）∪ dispatch 决定的 review 事件。对每个 change_class 从 plan 求解 handoff 可达。
+_CC = (load_yaml(ROOT / "standards" / "change-classes.yaml") or {}).get("classes") or {}
+_dispatch = ((((_TC.get("flow") or {}).get("verdict_layers") or {}).get("review") or {}).get("dispatch")) or {}
+if _dispatch and _graph and _order and _evt_prod:
+    def _edge_open(when, available):
+        """CNF 求值（AND of OR）：事件 token ∈ available；状态/函数条件
+        （planner.state==exited、no_release_face(wave)）视为 True——由其余防线保证。"""
+        for _clause in str(when).split("AND"):
+            _clause_val = False
+            for _alt in _clause.split("OR"):
+                _t = _alt.strip(" ()\t")
+                if "." not in _t or " " in _t or _t.startswith(("planner.", "builder.", "wave.")):
+                    _clause_val = True       # 非事件条件（状态断言/函数）——不阻塞
+                elif _t in available:
+                    _clause_val = True
+            if not _clause_val:
+                return False
+        return True
+
+    _base_events = {_ev for _ev, _p in _evt_prod.items()
+                    if not _ev.startswith("review.")
+                    and (str(_p).startswith(("platform", "owner")) or str(_p).startswith("mechanism:"))}
+    _ledger_cc_text = ((ROOT / "standards" / "attention-ledger.yaml").read_text(encoding="utf-8")
+                       + (ROOT / "standards" / "change-classes.yaml").read_text(encoding="utf-8"))
+    for _cc in _CC:
+        _d = _dispatch.get(_cc)
+        if not isinstance(_d, dict):
+            fail(f"verdict_layers.review.dispatch 缺 change_class '{_cc}' 条目（相位可达性不可解——ADR-0022）")
+            continue
+        _seat = str(_d.get("seat") or "")
+        if _d.get("mode") == "seat" and _seat not in _SEATS_DEF:
+            fail(f"review.dispatch.{_cc}.seat '{_seat}' 不在 seats.present_in_phases（悬空座位——ADR-0022）")
+        for _k in _d.get("extra_keys") or []:   # 合并钥匙必须有主（issue #31 C-2：owner_ratify 类）
+            if _k not in _evt_prod and _k not in _ledger_cc_text:
+                fail(f"review.dispatch.{_cc}.extra_keys '{_k}' 无事件生产者且无账本/变更类出处（悬空钥匙——ADR-0022）")
+        _av = set(_base_events)
+        if str(_d.get("mode")) == "waived":
+            _av.add("review.waived")
+        elif str(_d.get("mode")) == "seat":
+            _av.update(("review.approve", "review.changes_requested"))
+        _reached, _frontier = {"plan"}, ["plan"]
+        while _frontier:
+            _cur = _frontier.pop()
+            for _e in _graph:
+                if str(_e.get("from")) in (_cur, "any") and _edge_open(_e.get("when", ""), _av):
+                    _n = str(_e.get("to"))
+                    if _n not in _reached:
+                        _reached.add(_n)
+                        _frontier.append(_n)
+        if "handoff" not in _reached:
+            fail(f"team-collaboration: change_class '{_cc}' 相位不可达 handoff（reached={sorted(_reached)}，"
+                 f"review.dispatch.{_cc}.mode={_d.get('mode')!r}——分类死锁，ADR-0022/issue #31 C-1）")
+    for _cc in _dispatch:
+        if _cc not in _CC:
+            fail(f"verdict_layers.review.dispatch 引用不存在的 change_class '{_cc}'（dispatch 漂移——ADR-0022）")
 
 # services 成员引用：服务型座位绑定的 agent 必须存在且 approved（走查 P1：arbiter proposed 曾逃逸校验）
 OK = {"approved", "deprecated"}
@@ -140,6 +234,11 @@ for _arch, _prof in PROFILES.items():
         _v = _prof.get(_f)
         if _v is not None and _v not in _vals:
             fail(f"profile:{_arch} {_f}={_v!r} 不在合法取值域 {sorted(_vals)}")
+    # profile 白名单 ⊆ 词表（ADR-0022：agent 侧查词表而 profile 侧曾不查——双错可抵消）
+    _pv = set(((_prof.get("capabilities") or {}).get("allow")) or [])
+    _pbad = _pv - VOCAB
+    if _pbad:
+        fail(f"profile:{_arch} capabilities.allow 含词表外副作用: {sorted(_pbad)}（side-effects.yaml v2，ADR-0022）")
 
 # ---- gateway 配置对齐（ADR-0002 rev1）----
 GW_CFG = DATA / "deploy" / "llm-gateway" / "config.yaml"
@@ -280,6 +379,14 @@ for aid, a in agents.items():
     bad = allow - VOCAB
     if bad:
         fail(f"agent:{aid} capabilities.allow 含词表外副作用: {sorted(bad)}（side-effects.yaml v2）")
+    # ①b capability-whitelist（ADR-0022 实装——issue #31 A-1：变异 K–Q 七组越权曾双门禁全绿）
+    #    实例 allow ⊆ profile allow（fail-closed）：原型边界即实例边界。
+    #    CT-BLD-002/PLN-002/JDG-001/CUR-001/RSP-001/DEP-001/RES-001 的声明层强制点。
+    _prof_allow = set(((prof.get("capabilities") or {}).get("allow")) or [])
+    excess = allow - _prof_allow
+    if excess:
+        fail(f"agent:{aid} capabilities.allow 越出 profile({arch}) 白名单: {sorted(excess)}"
+             "（capability-whitelist——原型边界即实例边界，ADR-0022）")
     # ② agent 工具副作用 ⊆ allow（组合规则：工具可见当且仅当其副作用全被放行）
     for ref in cap.get("tools", []) or []:
         t = tools.get(ref.removeprefix("tool:")) or {}
@@ -287,6 +394,20 @@ for aid, a in agents.items():
         leak = tfx - allow
         if leak:
             fail(f"agent:{aid} 工具 {ref} 副作用 {sorted(leak)} 不在 allow 白名单内（fail-closed，ADR-0010）")
+    # ②b 执行通道覆盖（ADR-0022——issue #31 收敛判据 9 / 变异 A、B）：
+    #    tool_required 词必须有工具承载（删工具=失能力——防"白名单纸面授权"）；
+    #    platform_direct / runtime_builtin 为 side-effects.yaml 显式豁免登记。
+    _covered = set()
+    for ref in cap.get("tools", []) or []:
+        t = tools.get(ref.removeprefix("tool:")) or {}
+        _covered |= set(t.get("side_effects") or []) - {"none"}
+    _orphan_words = (allow & _TOOL_REQ) - _covered
+    if _orphan_words:
+        fail(f"agent:{aid} allow 含 tool_required 词 {sorted(_orphan_words)} 但无工具承载"
+             "（must/allow 与 tools 的双向覆盖——ADR-0022）")
+    _chanless = allow - _ALL_CHANNELS
+    if _chanless:
+        fail(f"agent:{aid} allow 含无执行通道词 {sorted(_chanless)}（side-effects delivery_channels 词表外——ADR-0022）")
     # ③ agent_tools 白名单 + 上限
     pat = (prof.get("capabilities") or {}).get("agent_tools") or {}
     p_allow, p_max = set(pat.get("allow") or []), pat.get("max", 0)
@@ -350,6 +471,44 @@ for aid, a in agents.items():
                 fail(f"agent:{aid} schema_ref 逃逸 registry 目录: {sr}")
             elif not sp.is_file():
                 fail(f"agent:{aid} schema_ref 文件不存在: {sr}")
+    # must_run 执行通道（ADR-0022——issue #31 变异 A/B-2：被要求的动作必须有可执行面）：
+    #   命令形态 ⟹ 须持 shell 类工具；check: 前缀 ⟹ 须已注册（checks.yaml）
+    for _mr in (a.get("guardrails") or {}).get("must_run") or []:
+        _m = str(_mr)
+        if _m.startswith("check:"):
+            if _m.removeprefix("check:") not in _CHECKS_LOADED:
+                fail(f"agent:{aid} must_run '{_m}' 引用未注册防线（checks.yaml——悬空强制项，ADR-0022）")
+            continue
+        if re.match(r"^[a-z0-9_./-]+(\s|$)", _m):     # 命令形态（make check / python3 …）
+            _has_shell = any(
+                {"shell_sandbox", "shell_host"} &
+                (set((tools.get(r.removeprefix("tool:")) or {}).get("side_effects") or []) - {"none"})
+                for r in cap.get("tools", []) or [])
+            if not _has_shell:
+                fail(f"agent:{aid} must_run 命令 '{_m}' 无 shell 类工具可执行（must_run×工具面断层，ADR-0022）")
+        else:
+            fail(f"agent:{aid} must_run '{_m}' 既非命令形态也非 check: 引用（执行通道未声明，ADR-0022）")
+    # 输出 schema 语义（ADR-0022——issue #31 变异 I/J：schema 被换掉≠契约仍在）
+    _out_ref = ((a.get("io_contract") or {}).get("output") or {}).get("schema_ref")
+    if _out_ref and (REG / _out_ref).is_file():
+        try:
+            _osch = json.loads((REG / _out_ref).read_text(encoding="utf-8"))
+        except Exception:
+            _osch = None      # 语法错误由 schema 语法校验块兜底
+        if isinstance(_osch, dict):
+            _oprops = set(_osch.get("properties") or {})
+            if arch == "test-author":   # CT-TA-004：不产 verdict（validate-executed）
+                _oid = str(_osch.get("$id", ""))
+                if "verdict" in _oid.lower():
+                    fail(f"agent:{aid} 输出 schema 指向判决族（{_oid}——test-author 不产 verdict，CT-TA-004，ADR-0022）")
+                _vbad = _oprops & {"verdict", "decision", "judgment", "pass", "fail", "approved"}
+                if _vbad:
+                    fail(f"agent:{aid} 输出 schema 含判决语义字段 {sorted(_vbad)}（test-author 不产 verdict，CT-TA-004，ADR-0022）")
+            _must_have = ((prof.get("io_guarantees") or {}).get("output_must_have")) or []
+            _missing = [k for k in _must_have if k not in _oprops]
+            if _missing:
+                fail(f"agent:{aid} 输出 schema {_out_ref} 缺 {arch}.io_guarantees.output_must_have "
+                     f"必备字段 {_missing}（输出契约链断裂，ADR-0022）")
     sr = (a.get("workflow") or {}).get("steps_ref")
     if sr:
         s = (REG / sr).resolve()
@@ -528,14 +687,7 @@ for _repo in sorted(_proj_repos - _repo_consumers):
 # ---- check:* 注册表校验（ADR-0012：悬空防线不可声明；ADR-0013：条目结构硬化）----
 # standards/ 与 registry/ 中一切 check:<id> 引用必须 ∈ standards/checks.yaml（fail-closed）。
 # 文本级扫描：引用嵌在自由文本（description/enforced_by/post_conditions）里，结构遍历会漏。
-CHECKS_REG = load_yaml(ROOT / "standards" / "checks.yaml") or {}
-# 根类型校验（评审项）：YAML 可解析为任意类型——列表/标量根须报结构错误而非崩溃
-if not isinstance(CHECKS_REG, dict):
-    fail(f"checks.yaml 根节点须为对象（version/checks），实为 {type(CHECKS_REG).__name__}")
-    CHECKS_REG = {}
-elif not isinstance(CHECKS_REG.get("checks"), list):
-    fail(f"checks.yaml 的 checks 须为列表，实为 {type(CHECKS_REG.get('checks')).__name__}")
-    CHECKS_REG["checks"] = []
+# 根类型校验已随提前加载（文件头部）完成；此处做条目结构校验。
 CHECKS = set()
 for _c in CHECKS_REG.get("checks", []) or []:
     # 条目结构校验（ADR-0013，PR#8 qodo 评审项）：畸形条目 fail 而非静默授权——
@@ -590,6 +742,112 @@ for scope_root, rel_root in ((ROOT / "standards", ROOT), (REG, DATA)):
 _ext = {c.get("id") for c in CHECKS_REG.get("checks", []) if isinstance(c, dict) and c.get("consumed_externally")}
 for cid in sorted(CHECKS - _scanned - _ext):
     fail(f"checks.yaml 登记 {cid} 未被任何声明引用（注册表漂移——登记项须有消费方）")
+# check 降级防护（ADR-0022——issue #31 变异 G）：id 在本仓 CI 有执行点（step name）
+# 的防线必须 active——有执行点却标 planned = 状态漂移（防静默摘除）
+_wf_text = ""
+for _wf in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+    _wf_text += _wf.read_text(encoding="utf-8")
+_ci_step_ids = set(re.findall(r"name:\s*([a-z][a-z0-9-]*)", _wf_text))
+for _c in CHECKS_REG.get("checks", []) or []:
+    if isinstance(_c, dict) and _c.get("id") in _ci_step_ids and _c.get("status") == "planned":
+        fail(f"checks.yaml: '{_c['id']}' 在本仓 CI 有执行点但 status=planned（状态漂移——"
+             f"有执行点的防线必须 active，ADR-0022）")
+
+# ---- 场景注册表防掏空（ADR-0022——issue #31 A-3/变异 E）----
+_SCEN_DOC = load_yaml(ROOT / "standards" / "scenarios.yaml") or {}
+_scenarios = _SCEN_DOC.get("scenarios") or {}
+for _sid, _spec in _scenarios.items():
+    if not isinstance(_spec, dict):
+        continue
+    if not (_spec.get("asserts") or _spec.get("hook")):
+        fail(f"scenario:{_sid} 无 asserts 且无 hook（空壳场景——场景注册表掏空，ADR-0022）")
+_floor = ((_SCEN_DOC.get("registry") or {}).get("asserts_floor_total")) if isinstance(_SCEN_DOC.get("registry"), dict) else None
+_total_asserts = sum(len(s.get("asserts") or []) for s in _scenarios.values() if isinstance(s, dict))
+if _floor is not None and _total_asserts < _floor:
+    fail(f"scenarios: 声明式断言总数 {_total_asserts} < asserts_floor_total {_floor}"
+         "（断言掏空——下调 floor 须走 C1 PR 显式评审，ADR-0022）")
+
+# ---- workflow 绑定完整性（ADR-0022——issue #31 B-7）----
+_steps_refs = set()
+for aid, a in agents.items():
+    _wf = a.get("workflow") or {}
+    if not isinstance(_wf, dict):
+        continue
+    if _wf.get("mode") == "fixed" and not _wf.get("steps_ref"):
+        fail(f"agent:{aid} workflow.mode=fixed 但缺 steps_ref（固定流程必须绑定文件——ADR-0022）")
+    if _wf.get("steps_ref"):
+        _steps_refs.add(str(_wf["steps_ref"]))
+for _wf_file in sorted((REG / "workflows").glob("*.md")):
+    if f"workflows/{_wf_file.name}" not in _steps_refs:
+        fail(f"registry/workflows/{_wf_file.name} 未被任何 agent steps_ref 引用（孤儿 workflow——ADR-0022）")
+
+# ---- adversary 凭据借用声明（ADR-0022——issue #31 B-5）----
+# 存在 adversary-executed CT ⟹ adversary 实例必须声明 credential.impersonation
+# （凭据副本签发机制显式化——否则 13 条 CT 的 who 字段物理不可执行）
+if any(isinstance(ct, dict) and ct.get("runtime") == "adversary-executed" for ct in CT_REG.values()):
+    for _aid, _a in agents.items():
+        if _a.get("archetype") == "adversary" and not ((_a.get("credential") or {}).get("impersonation")):
+            fail(f"agent:{_aid} 无 credential.impersonation（存在 adversary-executed CT——"
+                 f"目标原型凭据副本的签发/销毁须声明化，ADR-0022）")
+
+# ---- intent-routing flow_ref fail-closed（ADR-0022——issue #31 D-3）----
+# IR/INTENTS 在下方路由表校验块才定义——以函数封装、由该块尾调用（_check_flow_refs）
+def _check_flow_refs() -> None:
+    _EXT_REFS = {str(x.get("ref")) for x in (IR.get("external_flow_refs") or []) if isinstance(x, dict)}
+    for iid, spec in INTENTS.items():
+        if not isinstance(spec, dict):
+            continue
+        fr = spec.get("flow_ref")
+        if not fr:
+            fail(f"intent:{iid} 缺 flow_ref（路由表条目不完整——ADR-0022）")
+            continue
+        fr = str(fr)
+        if fr.startswith("external:"):
+            if fr not in _EXT_REFS:
+                fail(f"intent:{iid} flow_ref '{fr}' 未登记于 external_flow_refs 豁免清单"
+                     "（外部引用须显式承担不可审计边界，ADR-0022）")
+            continue
+        if "#" not in fr:
+            fail(f"intent:{iid} flow_ref '{fr}' 缺锚（须 file#anchor 形式，ADR-0022）")
+            continue
+        _file, _, _anchor = fr.partition("#")
+        _fp = None
+        for _cand in (ROOT / "standards" / _file, ROOT / _file):
+            if _cand.is_file():
+                _fp = _cand
+                break
+        if _fp is None:
+            fail(f"intent:{iid} flow_ref 文件不存在: {_file}（fail-closed——ADR-0022）")
+            continue
+        _fdoc = load_yaml(_fp) or {}
+        _cur = _fdoc
+        for _seg in str(_anchor).split("."):
+            if isinstance(_cur, dict) and _seg in _cur:
+                _cur = _cur[_seg]
+            else:
+                fail(f"intent:{iid} flow_ref 锚不可解析: {fr}（fail-closed——ADR-0022）")
+                break
+
+# ---- JSON Schema 语法校验（ADR-0022——issue #31 D-5：语法损坏的 schema 不得过门禁）----
+for sp in sorted((REG / "schemas").glob("*.json")):
+    try:
+        _sch = json.loads(sp.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        fail(f"schema 语法错误: {sp.name}: {e}（io 契约载体必须可解析，ADR-0022）")
+        continue
+    if not isinstance(_sch, dict) or _sch.get("type") != "object":
+        fail(f"schema {sp.name} 顶层须为 type: object（io 契约载体——ADR-0022）")
+        continue
+    if not isinstance(_sch.get("properties"), dict):
+        fail(f"schema {sp.name} 缺 properties 对象（ADR-0022）")
+        continue
+    _req = _sch.get("required")
+    if _req is not None and not isinstance(_req, list):
+        fail(f"schema {sp.name} required 须为数组（ADR-0022）")
+        continue
+    _req_unknown = [k for k in (_req or []) if k not in (_sch.get("properties") or {})]
+    if _req_unknown:
+        fail(f"schema {sp.name} required 引用未定义字段 {_req_unknown}（ADR-0022）")
 
 # ---- ADR 编号唯一性（ADR-0013：issue #9 P1-6）----
 # decisions/ADR-NNNN-slug.md 编号冲突即 FAIL。唯一豁免 = ADR-0011 历史双档
@@ -646,6 +904,7 @@ _intent_classes = {spec.get("change_class") for spec in INTENTS.values()
 for cc in ("trivial", "spike"):
     if cc in CHANGE_CLASSES and cc not in _intent_classes:
         fail(f"change-class '{cc}' 已定义但无 intent 路由到它（孤类——路由表不完整）")
+_check_flow_refs()   # ADR-0022：flow_ref fail-closed（IR/INTENTS 已就绪）
 
 # ---- CT ↔ scenario 双向链接校验（ADR-0015：测试底层方法统一）----
 # control-tests 每条：scenario=声明层先决场景（必须存在于 scenarios.yaml，可 null）；

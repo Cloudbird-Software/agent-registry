@@ -12,6 +12,10 @@ version: 1
 #   4. 引入新开源项目 = registry PR（change-classes dep 类同等适用：sca/license-check/
 #      hash-pin + owner_ratify——给产品代码定的防线，自己吃的基础设施同样成立）
 #   5. 反向：无消费者的条目 = 死条目（validate 拒绝——与 ct-coverage 反向同模式）
+# 边界（ADR-0022 对齐 issue #31 D-2）：本清单管【开源供应链依赖】。机制原型
+#   （archetype-profiles kind=mechanism）的 implementation 指向 org 内部仓/平台设施
+#   （如 drift-check 的 .github/governance/）——org-internal 资产非开源依赖，不入
+#   本清单；其声明/绑定/幽灵检测由 archetype-profiles + validate 机制命名绑定承担。
 # ============================================================================
 audit_policy:
   tool: osv-scanner + renovate（git 依赖钉版本）

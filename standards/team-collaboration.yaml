@@ -72,7 +72,11 @@ channels:                            # 通信两模式（openjiuwen）+ 人通�
       cards.*:     {read: [team_members, scheduler], write: [scheduler]}
       findings.*:  {read: [owner, curator, adversary], write: [adversary, mechanism:verifier]}  # gaming 检测在 verifier（holdout/visible 分裂）——ADR-0021 命名统一；builder 申诉经 evidence-pack 附副本（无直读权）
       decisions.*: {read: [team_members, judge, owner], write: [judge, owner]}   # judge 写=decision_made 自述事件（平台通道）
-      review.*:    {read: [team_members, scheduler, owner], write: [test_author]}   # review 裁定= test_author decision 类自述事件（合并闸门钥匙之一）
+      review.*:    {read: [team_members, scheduler, owner], write: [test_author, curator]}
+                                      # review 裁定= decision 类自述事件（合并闸门钥匙之一）；
+                                      # test_author=代码符合性（logic/dep/schema/prod），
+                                      # curator=spike 入库审核（dispatch 表——ADR-0022）；
+                                      # payload 契约=registry/schemas/review-decision.json
       events.*:    {read: [metrics-aggregator, owner], write: [platform]}   # 平台带外
       incidents.*: {read: [responder, deployer, owner], write: [responder, deployer, owner]}
       backlog.proposals.*: {read: [curator], write: [curator, responder, owner, planner]}   # 提案层（多写者；ACL 唯一真源）
@@ -163,8 +167,11 @@ services:                            # 共享服务：跨队、按需实例化�
     kind: mechanism
     id: card-gate
     output_event: cards.ratified
-    requires: [schema 合规, capability_tags 非空, depends_on 为 DAG, testability_signoff（test_author 逐卡）,
-               test_tree_sha 已回写卡（测试树冻结——无树不批卡）,
+    requires: [schema 合规, capability_tags 非空, depends_on 为 DAG,
+               "testability_signoff（test_author 逐卡——仅 acceptance-face 类：change_class ∉ [doc, trivial]；
+                 trivial 自明验收无 acceptance 树可审，判卷面=lint+unit（builder 工作面）——ADR-0022 消除快车道互斥）",
+               "test_tree_sha 已回写卡（测试树冻结——无树不批卡；同上条件化：doc/trivial 无 acceptance 树，
+                 unit 树随 PR 由 verifier 判卷）",
                knowledge 处置完成（PART 3 artifacts.card.knowledge_refs）, contracts 存在（N>1 时）, risk_class 已标注]
     owner_involvement: none          # owner 只批 intent 与 normative amendment
   judge:                             # 仲裁（激活条件见 PART 5；未激活时 escalation 直达 owner）
@@ -300,22 +307,31 @@ flow:                                # 波次相位状态机（simulate-wave.py 
       - {from: plan,    to: build,     when: "cards.ratified AND planner.state == exited"}   # 消除同事件竞态
       - {from: build,   to: verify,    when: pr.opened}
       - {from: verify,  to: build,     when: review.changes_requested}      # 返工回边（必须有）
-      - {from: verify,  to: integrate, when: "gate.pass AND review.approve"}
+      - {from: verify,  to: integrate, when: "gate.pass AND (review.approve OR review.waived)"}   # waived=doc/trivial
+                                     # 免 review（dispatch 表判定，card_gate 产事件）——waived≠免判卷：verifier gate
+                                     # 照跑（change-classes trivial.review 注）。ADR-0022：原"AND review.approve"使
+                                     # review=none 类按 change_class 分类死锁（issue #31 C-1）
       - {from: any,     to: plan,      when: amendment.normative.accepted}  # planner 重入
       - {from: any,     to: plan,      when: retries.exhausted}   # 重试耗尽回炉重规划（flows#budget.enforcement
                                      # 的相位载体——ADR-0021：承诺必须有边，否则返工振荡无终止条件）
       - {from: integrate, to: handoff, when: "released_behind_flag OR reverted OR no_release_face(wave)"}   # 发布后进交接相位；
                                      # no_release_face=波次全部卡 change_class ∈ [doc, spike]（merge/入库即交接——ADR-0021）
     phase_order: [plan, build, verify, integrate, handoff]
-    deadlock_check: 每 phase 存在可达 exit 边（validate 校验；终态=handoff，队销毁由 lifecycle.destroy 表达）
+    deadlock_check: 每 phase 存在可达 exit 边（validate 校验：from==<phase> 的专属出边——any 通配边不计入，
+                     否则恒真；终态=handoff，队销毁由 lifecycle.destroy 表达。ADR-0022 修复 issue #31 A-4）
   event_producers:                   # 相位图与主流程引用的一切事件的生产者（悬空事件=状态机不可执行）
     intent.received:            mechanism:interface-gateway
     intent.ratified:            owner（经 interface-gateway 签名落事件）
     cards.ratified:             mechanism:card-gate
-    pr.opened:                  platform（git 事件带外）
+    pr.opened:                  platform（git 事件带外——含 spike/doc 类的产出入库 PR）
     gate.pass:                  mechanism:verifier
-    review.approve:             seat:test_author（decision 类自述事件）
+    review.approve:             "seat:test_author（decision 类自述事件；spike 类 seat:curator 入库审核——
+                                dispatch 表，ADR-0022）"
     review.changes_requested:   seat:test_author（decision 类自述事件）
+    review.waived:              mechanism:card-gate（dispatch 表判定 change_class.review==none 时产——
+                                doc/trivial 免 review 的机器可判定载体；waived≠免判卷）
+    owner_ratify:               owner（dep/schema 合并第三钥，经平台通道——merge_policy；
+                                账本 asynchronous.dep_and_schema_owner_ratify）
     amendment.normative.accepted: owner
     released_behind_flag:       mechanism:release-bot
     reverted:                   mechanism:release-bot
@@ -334,12 +350,25 @@ flow:                                # 波次相位状态机（simulate-wave.py 
     card.aborted:               owner（经平台通道——reason 必填，reason_routing 决定善后）
   verdict_layers:                    # 三层判决（review≠判卷——判卷是 verifier 机制）
     gate:        {type: mechanism, covers: "CI/holdout/mutation/contract_conformance", output: pass/fail+evidence}
-    review:      {type: seat(test_author), question: "实现是否满足卡意图（不只是过测试）",
-                  binding: "change_class：doc 免 review；logic 必须"}
+    review:                          # 意图符合性裁定——裁定者与形态按 change_class 分派（ADR-0022：
+                                     # dispatch 是机器真源，validate 按此类做 per-class 相位可达性求解）
+      type: seat（按 dispatch 分派）
+      question: "实现是否满足卡意图（不只是过测试）"
+      dispatch:                       # change_class → 裁定形态（与 change-classes.classes.<cc>.review 对齐）
+        doc:     {mode: waived}                    # review.waived（card_gate 产）
+        trivial: {mode: waived}                    # review.waived——verifier 判卷不豁免
+        logic:   {mode: seat, seat: test_author}
+        spike:   {mode: seat, seat: curator}       # 入库审核（跨团队=可审；ADR 归 decisions/ 走 C1）
+        dep:     {mode: seat, seat: test_author, extra_keys: [owner_ratify]}
+        schema:  {mode: seat, seat: test_author, extra_keys: [owner_ratify]}
+        prod:    {mode: seat, seat: test_author, extra_keys: [owner_per_action]}
+                                     # prod 的 owner_per_action=生产动作审批（flag 开启/环境审批，
+                                     # non_delegable）发生在 integrate 之后——verify 出边不受其阻塞
+      payload_schema: registry/schemas/review-decision.json
     arbitration: {type: service(judge), trigger: builder↔test_author 僵持,
                   routing: "'测试写错了'先走 test-author 修复路径（amendment.test_fix）；僵持才仲裁；judge 未激活 → 直达 owner",
                   during_dispute: {run: frozen, budget_clock: paused}}   # 争议期间卡冻结（同 amendment.during）
-  merge_policy: "gate.pass AND review.approve（dep/schema 类另需 owner_ratify 第三钥）→ mechanism:integrator 自动合并（无人工；治理仓除外）"
+  merge_policy: "gate.pass AND (review.approve OR review.waived)（dep/schema 类另需 owner_ratify 第三钥）→ mechanism:integrator 自动合并（无人工；治理仓除外）"
 
 artifacts:                           # 制品=一切跨阶段/跨团队传递的载体（artifact_mediated 的 medium）
   card:                              # 卡=上下文契约+预算载体+追溯单元（一切工作的原子）
@@ -464,7 +493,8 @@ budget:                              # 三层预算 + 不变式（invariants 优
 
 attention:                           # owner 注意力账本 → 独立文件 standards/attention-ledger.yaml（validate 校验）
   ledger_ref: standards/attention-ledger.yaml
-  conservation_rule: 新增 owner-blocking 点必须同时移除一个（账本为证，非口号）
+  conservation_rule: 新增 owner-blocking 类目必须同时移除一个（账本为证；类目内交互频次由类目
+                     语义界定并在 metrics 周报可审计——静态层守恒类目数，ADR-0022 语义对齐）
 
 metrics:                             # 指标层通则：低事件密度下比率无信息量 → 两栏制
   absolute_signals:                  # 绝对信号：零样本即触发（不需 min_sample）

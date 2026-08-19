@@ -280,8 +280,11 @@ def scenario_happy_path():
     check(seat_present("builder", "verify"), "A1", "S1: builder 不在 verify 相位（review 驳回后无法返工）")
     vl = (TC.get("flow") or {}).get("verdict_layers") or {}
     check(str((vl.get("gate") or {}).get("type")) == "mechanism", "A2", "S1: gate 层非机制")
-    check("seat(test_author)" in str((vl.get("review") or {}).get("type", "")), "A1",
-          "S1: review 层非 test_author 座位（意图符合性审查缺位）")
+    _rev_type = str((vl.get("review") or {}).get("type", ""))
+    _rev_dispatch = (vl.get("review") or {}).get("dispatch") or {}
+    check(_rev_type.startswith("seat") and any(
+        str(d.get("seat")) == "test_author" for d in _rev_dispatch.values() if isinstance(d, dict)), "A1",
+        "S1: review 层非座位承担或 dispatch 无 test_author 条目（意图符合性审查缺位——ADR-0022 dispatch 表）")
     # review 裁定的发布面（合并闸门钥匙之一——无频道=verify 永远出不去）
     acl = (((TC.get("channels") or {}).get("pub_sub") or {}).get("acl") or {})
     review_acl = acl.get("review.*") or {}
