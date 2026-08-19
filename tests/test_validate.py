@@ -342,3 +342,195 @@ def test_orphan_approved_agent_fails(tree: Path):
     data["model"]["alias"] = "coder-deep"
     dump_yaml(ghost, data)
     assert_rejected(run_validate(tree), r"agent:ghost-role approved 但无任何团队/服务/agent_tools 引用")
+
+
+# ══ 负向：ADR-0022 注册层门禁硬化（issue #31 审计收敛——每条新防线至少一注）══
+# 变异编号沿用 issue #31 的 18 组实验；B（responder.tools=[]）按 platform-direct
+# 设计豁免（ADR-0022 决策 3），不设负向测试。
+
+def test_mutation_K_capability_whitelist_fails(tree: Path):
+    """变异 K：builder.allow += vcs_merge——越出 profile 白名单必须被拒（A-1）"""
+    p = tree / "registry" / "agents" / "backend-dev.yaml"
+    data = load_yaml(p)
+    data["capabilities"]["allow"].insert(0, "vcs_merge")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"backend-dev capabilities.allow 越出 profile\(builder\) 白名单.*vcs_merge")
+
+
+def test_mutation_O_curator_vcs_admin_fails(tree: Path):
+    """变异 O：curator.allow += vcs_admin——全系统唯 owner 持有必须被拒（A-1）"""
+    p = tree / "registry" / "agents" / "curator-main.yaml"
+    data = load_yaml(p)
+    data["capabilities"]["allow"].insert(0, "vcs_admin")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"curator-main capabilities.allow 越出 profile\(curator\) 白名单.*vcs_admin")
+
+
+def test_mutation_A_must_run_without_shell_fails(tree: Path):
+    """变异 A：删 builder 的 bash 但保留 must_run['make check']——执行面断层必须被拒"""
+    p = tree / "registry" / "agents" / "backend-dev.yaml"
+    data = load_yaml(p)
+    data["capabilities"]["tools"] = [t for t in data["capabilities"]["tools"] if t != "tool:bash"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"backend-dev must_run 命令 'make check' 无 shell 类工具可执行")
+
+
+def test_mutation_E_scenario_asserts_gutted_fails(tree: Path):
+    """变异 E：掏空 S13 的全部 asserts——空壳场景必须被拒（A-3）"""
+    p = tree / "standards" / "scenarios.yaml"
+    data = load_yaml(p)
+    del data["scenarios"]["S13-trivial-fastpath"]["asserts"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"S13-trivial-fastpath 无 asserts 且无 hook")
+
+
+def test_mutation_E_asserts_floor_fails(tree: Path):
+    """变异 E 变体：删 7 条断言使总数跌破 floor——必须被拒（防静默删除断言）"""
+    p = tree / "standards" / "scenarios.yaml"
+    data = load_yaml(p)
+    data["scenarios"]["S13-trivial-fastpath"]["asserts"] = data["scenarios"]["S13-trivial-fastpath"]["asserts"][:1]
+    data["scenarios"]["S13-trivial-fastpath"]["hook"] = "scenario_happy_path"  # 规避空壳检查，专测 floor
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"声明式断言总数 \d+ < asserts_floor_total")
+
+
+def test_mutation_F_dangling_seat_producer_fails(tree: Path):
+    """变异 F：event_producers['review.approve'] 改为 ghost 座位——悬空引用必须被拒"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    data["flow"]["event_producers"]["review.approve"] = "seat:ghost_does_not_exist"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"review\.approve.*seat:ghost_does_not_exist 不在 seats")
+
+
+def test_mutation_G_check_downgrade_fails(tree: Path):
+    """变异 G：adr-required 从 active 降为 planned——有 CI 执行点的防线不可降级"""
+    p = tree / "standards" / "checks.yaml"
+    data = load_yaml(p)
+    for c in data["checks"]:
+        if c["id"] == "adr-required":
+            c["status"] = "planned"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"adr-required.*有执行点但 status=planned")
+
+
+def test_mutation_I_test_author_verdict_schema_fails(tree: Path):
+    """变异 I：reviewer 输出 schema 换成 verdict.json——CT-TA-004 必须被拒"""
+    p = tree / "registry" / "agents" / "reviewer.yaml"
+    data = load_yaml(p)
+    data["io_contract"]["output"]["schema_ref"] = "schemas/verdict.json"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"reviewer 输出 schema 指向判决族.*CT-TA-004")
+
+
+def test_mutation_J_planner_output_contract_fails(tree: Path):
+    """变异 J：planner 输出 schema 换成 findings.json——io_guarantees 契约链必须被拒"""
+    p = tree / "registry" / "agents" / "wave-planner.yaml"
+    data = load_yaml(p)
+    data["io_contract"]["output"]["schema_ref"] = "schemas/findings.json"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"wave-planner 输出 schema.*io_guarantees.*\[.*cards.*\]")
+
+
+def test_mutation_R_deadlock_validate_side_fails(tree: Path):
+    """变异 R：相位图删到只剩 any→plan——validate（而非仅模拟器）必须报死锁（A-4）"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    s = p.read_text(encoding="utf-8")
+    a = s.index("      - {from: plan,")
+    b = s.index("    phase_order:")
+    p.write_text(s[:a] + "      - {from: any,     to: plan,      when: amendment.normative.accepted}\n" + s[b:],
+                 encoding="utf-8")
+    assert_rejected(run_validate(tree), r"phase '(plan|build|verify|integrate)' 无专属出边")
+
+
+def test_c1_deadlock_any_edge_not_counted(tree: Path):
+    """C-1：dispatch 删除 doc 条目——doc 类相位不可达 handoff 必须被拒"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    del data["flow"]["verdict_layers"]["review"]["dispatch"]["doc"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"dispatch 缺 change_class 'doc'|change_class 'doc' 相位不可达 handoff")
+
+
+def test_c2_owner_ratify_needs_producer(tree: Path):
+    """C-2：dispatch 引用无生产者钥匙——悬空钥匙必须被拒"""
+    p = tree / "standards" / "team-collaboration.yaml"
+    data = load_yaml(p)
+    data["flow"]["verdict_layers"]["review"]["dispatch"]["dep"]["extra_keys"] = ["owner_ghost_key"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"extra_keys 'owner_ghost_key' 无事件生产者")
+
+
+def test_d3_flow_ref_dangling_fails(tree: Path):
+    """D-3：flow_ref 指向不存在的文件——fail-closed 必须被拒"""
+    p = tree / "standards" / "intent-routing.yaml"
+    data = load_yaml(p)
+    data["intents"]["deliver"]["flow_ref"] = "flows.yaml#nonexistent.anchor.path"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"intent:deliver flow_ref 锚不可解析")
+
+
+def test_d3_external_flow_ref_unregistered_fails(tree: Path):
+    """D-3：external: 前缀未登记豁免清单——必须被拒"""
+    p = tree / "standards" / "intent-routing.yaml"
+    data = load_yaml(p)
+    data["intents"]["deliver"]["flow_ref"] = "external:平台仓 governance/GOVERNANCE.yaml#flows.other"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"intent:deliver flow_ref.*未登记于 external_flow_refs")
+
+
+def test_d5_json_schema_syntax_fails(tree: Path):
+    """D-5：语法损坏的 schema 不得过门禁"""
+    (tree / "registry" / "schemas" / "broken.json").write_text('{"type": "object", ', encoding="utf-8")
+    assert_rejected(run_validate(tree), r"schema 语法错误: broken\.json")
+
+
+def test_d5_required_undefined_field_fails(tree: Path):
+    """D-5：required 引用未定义字段必须被拒"""
+    (tree / "registry" / "schemas" / "broken-req.json").write_text(
+        '{"type": "object", "properties": {"a": {"type": "string"}}, "required": ["ghost"]}',
+        encoding="utf-8")
+    assert_rejected(run_validate(tree), r"broken-req\.json required 引用未定义字段 \['ghost'\]")
+
+
+def test_b7_fixed_workflow_without_steps_ref_fails(tree: Path):
+    """B-7：mode=fixed 无 steps_ref 必须被拒"""
+    p = tree / "registry" / "agents" / "arbiter.yaml"
+    data = load_yaml(p)
+    del data["workflow"]["steps_ref"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"arbiter workflow\.mode=fixed 但缺 steps_ref")
+
+
+def test_b7_orphan_workflow_fails(tree: Path):
+    """B-7：未被引用的 workflow 文件（孤儿）必须被拒"""
+    (tree / "registry" / "workflows" / "orphan.steps.md").write_text("# orphan\n", encoding="utf-8")
+    assert_rejected(run_validate(tree), r"orphan\.steps\.md 未被任何 agent steps_ref 引用")
+
+
+def test_b5_adversary_impersonation_required(tree: Path):
+    """B-5：存在 adversary-executed CT 而 adversary 无凭据借用声明——必须被拒"""
+    p = tree / "registry" / "agents" / "red-adversary.yaml"
+    data = load_yaml(p)
+    del data["credential"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"red-adversary 无 credential\.impersonation")
+
+
+def test_channel9_tool_required_word_orphan_fails(tree: Path):
+    """判据 9：allow 含 tool_required 词但无工具承载（如 planner 拿 vcs_pr_open 无 gitcode-pr）"""
+    p = tree / "registry" / "agents" / "wave-planner.yaml"
+    data = load_yaml(p)
+    data["capabilities"]["allow"].append("vcs_pr_open")
+    data["capabilities"]["tools"] = ["tool:read_file", "tool:write_file"]  # 无 gitcode-pr
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"wave-planner allow 含 tool_required 词.*vcs_pr_open.*无工具承载")
+
+
+def test_d4_ledger_key_rename_enforced(tree: Path):
+    """D-4：旧键名 max_synchronous_per_week 回潮必须被拒（语义更名保护）"""
+    p = tree / "standards" / "attention-ledger.yaml"
+    data = load_yaml(p)
+    data["max_synchronous_per_week"] = data.pop("max_synchronous_categories")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"max_synchronous_per_week 已更名 max_synchronous_categories")

@@ -18,7 +18,13 @@ version: 1
 #
 # 边界（诚实声明）：模拟测"声明的世界"（权限/相位/预算/事件逻辑自洽）；
 #   实现的世界归 gate/verifier；防线真实有效归 escape_review/CT。
+#
+# 防掏空（ADR-0022 修复 issue #31 A-3/变异 E）：validate 校验——
+#   ① 每场景 asserts 或 hook 至少其一（空壳场景=场景注册表漂移）；
+#   ② 声明式断言总数 >= asserts_floor_total（下调须改本文件走 C1 PR——评审可见）。
 # ============================================================================
+registry:
+  asserts_floor_total: 79             # = 当前声明式断言总数（新增场景自然上移；删除即跌破——下调须走 C1 PR）
 scenarios:
 
   # ── S1-S12 存量场景（ADR-0011 建立；断言主体在 simulate-wave.py hook）──────

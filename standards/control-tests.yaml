@@ -81,13 +81,13 @@ tests:
     runtime: validate-executed
   CT-TA-004:
     claim: test-author 不产 verdict
-    who: test-author
-    how: 检查其 io_contract 输出 schema 无判决字段
+    who: 声明层
+    how: validate 检查 test-author 实例 io_contract 输出 schema——$id 非 verdict 族且 properties
+      无判决语义字段（verdict/decision/judgment/pass/fail/approved）
     expected: 输出仅测试产物+说明
     on_success: P1
     scenario: null
-    runtime: manual_only
-    runtime_note: 输出 schema 语义抽查——validate 未覆盖，随 io_contract 语义校验二期
+    runtime: validate-executed   # ADR-0022：validate 实装输出语义检查（原 manual_only）
   CT-JDG-001:
     claim: judge 无写路径与网络
     who: judge 实例凭据
@@ -124,13 +124,14 @@ tests:
     runtime_note: case_law 未激活（on_trigger）；激活前无判例可查
   CT-CUR-001:
     claim: curator 无 vcs_admin
-    who: curator 凭据
-    how: 尝试改 ruleset/secret/设置
-    expected: 平台角色拒绝
+    who: 声明层
+    how: validate capability-whitelist——agent.allow ⊆ profile.allow（curator profile 无
+      vcs_admin）+ 全仓无 agent.allow 含 vcs_admin（唯 owner 伪原型 holdings 持有，
+      不实例化）；运行时平台角色复核归 drift-check §9 对账
+    expected: 声明层拒绝（fail-closed）；平台角色拒绝（运行时）
     on_success: P0
     scenario: null
-    runtime: manual_only
-    runtime_note: 平台角色拒绝——运行时凭据攻击
+    runtime: validate-executed   # ADR-0022：validate 实装（原 manual_only）
   CT-CUR-002:
     claim: 治理之治理路径 owner-only
     who: curator 凭据
@@ -177,13 +178,14 @@ tests:
     runtime: validate-executed
   CT-RES-001:
     claim: researcher 无写路径
-    who: researcher 凭据
-    how: 尝试写文件/仓库/数据层
-    expected: 拒绝
+    who: 声明层
+    how: validate capability-whitelist——researcher profile.allow ∩ 写词组（fs_write_repo/
+      fs_write_sandbox/datastore_write/vcs_branch_push/vcs_pr_open/deploy_*/schema_migrate/
+      data_freeze/data_delete/secret_read/ci_trigger/shell_*）= ∅；实例 allow ⊆ profile
+    expected: 声明层拒绝（fail-closed）；运行时凭据攻击归 red_cell 复核（激活后）
     on_success: P0
     scenario: null
-    runtime: manual_only
-    runtime_note: 凭据攻击面——运行时
+    runtime: validate-executed   # ADR-0022：validate 实装（原 manual_only）
   CT-RES-002:
     claim: findings 必带 sources+source_class
     who: researcher 输出

@@ -29,6 +29,7 @@ independence:
   - test-author
 workflow:
   mode: fixed
+  steps_ref: workflows/arbiter.steps.md   # ADR-0022 修复 issue #31 B-7：fixed 必绑固定流程
 permissions:
   inherit: org-default
   overrides:

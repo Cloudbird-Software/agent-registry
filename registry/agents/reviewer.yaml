@@ -18,6 +18,9 @@ capabilities:
     refs: []                             # profile: max=0（不接受任何 agent 喂结论）
 isolation: hermetic                      # 与 builder 物理隔离，不共享草稿记忆
 approval: auto
+workflow:                                # ADR-0022 修复 issue #31 B-7：绑定既有固定流程（原孤儿文件）
+  mode: fixed
+  steps_ref: workflows/reviewer.steps.md
 independence:
   distinct_model_family_from: [builder]  # 族级（validate 对照 models.yaml family）
 permissions:

@@ -12,7 +12,9 @@ version: 1
 #      按本表机制判定（owner 说人话，不说类别）。
 #   R3 注意力只花在"新对错"上：验收三分法（见 acceptance_source）是路由表的经济基础。
 #
-# validate.py 校验：每类意图的 carrier/change_class/flow 引用必须存在（fail-closed）。
+# validate.py 校验：每类意图的 carrier/change_class/flow 引用必须存在（fail-closed）；
+# flow_ref 形如 "file#anchor"（相对 standards/ 的声明文件 + 点路径锚，二者须实存且可解析），
+# 或 "external:…" 前缀（平台仓流程——必须登记于下方 external_flow_refs 豁免清单，ADR-0022）。
 # ============================================================================
 
 # ---- 验收标准三分法（R3 的精确化）----
@@ -23,6 +25,19 @@ version: 1
 # predetermined    = 预声明验收：载体声明里已写死（exit_criteria / 回滚预案先行）
 # evidence_based   = 证据即验收：问题被证据回答，产出物 schema 校验即合格（ADR/finding）
 acceptance_sources: [new_ratable, self_evident, pre_approved, predetermined, evidence_based]
+
+# ---- 外部流程引用豁免清单（fail-closed——ADR-0022 修复 issue #31 D-3）----
+# flow_ref 以 external: 前缀声明的引用指向平台仓流程定义（本仓不可审计的边界在此显式承担）；
+# 未登记的 external 引用 = validate 拒绝。登记项须带 consumer 与 why。
+external_flow_refs:
+  - ref: "external:平台仓 governance/GOVERNANCE.yaml#flows.governance_change"
+    consumer: intents.govern
+    why: org 治理流程（C1/C2/C3 分级）定义在平台仓；本仓可见执行点=CODEOWNERS owner-only
+      + validate.yml adr-required/stddiff（ADR-0013/0011），同源引用见 ADR-0017/0019
+  - ref: "external:平台仓 governance/GOVERNANCE.yaml#flows.new_repo"
+    consumer: intents.spawn
+    why: 建仓机制链（template 建仓→init 防线→REPOS.yaml 申报→骨架 PR）宿主在平台仓；
+      首模块转 deliver 后回本表 deliver 路径
 
 # ---- 八分类路由表 ----
 intents:
@@ -40,7 +55,7 @@ intents:
     acceptance_source: self_evident
     owner_sync: none（下达即全部成本）
     change_class: trivial
-    flow_ref: "flows.yaml#intent_ratification（shortcut: self_evident）"
+    flow_ref: flows.yaml#intent_ratification.shortcuts.self_evident
     note: 升级例外（路径规则自动升 logic，见 change-classes trivial）——触及 dep/schema/
       tests/acceptance/** 或跨模块即不再是 trivial；verifier 判卷不豁免（小修免检通道
       一旦存在，"小"的定义必然膨胀——反仪式膨胀的对偶是例外膨胀）；
@@ -76,29 +91,30 @@ intents:
     carrier: registry PR（C1/C2/C3 分级——GOVERNANCE flows.governance_change）
     acceptance_source: predetermined
     owner_sync: 按账本（多数 asynchronous 有默认动作）
-    flow_ref: governance/GOVERNANCE.yaml#flows.governance_change
+    flow_ref: "external:平台仓 governance/GOVERNANCE.yaml#flows.governance_change"
   spawn:
     what: 新仓库/新项目启动
     examples: ["起新项目 X"]
     carrier: new_repo 机制链（template 建仓→init 防线→REPOS.yaml 申报→骨架 PR）→ 首模块转 deliver
     acceptance_source: pre_approved      # 基建=模板即验收；首模块转 deliver（new_ratable，示例照批）
     owner_sync: 1×（并入首模块验收示例）
-    flow_ref: governance/GOVERNANCE.yaml#flows.new_repo
+    flow_ref: "external:平台仓 governance/GOVERNANCE.yaml#flows.new_repo"
   ask:
     what: 问询状态/事实（无变更）
     examples: ["X 现在什么状态", "这周烧了多少"]
     carrier: researcher as_tool（无卡无队单次往返）→ TUI 视图（observability，ADR-0014 PR-B）
     acceptance_source: evidence_based
     owner_sync: none
-    flow_ref: paradigms.agent_as_tool
+    flow_ref: team-collaboration.yaml#paradigms.agent_as_tool
 
 # ---- 路由机制（R2：owner 不分类）----
 routing:
   classifier: interface-gateway（机制）：intent.received 事件落库后按本表 what/examples
     语义匹配 + 变更面探测（diff 面积/路径/依赖）自动归类；歧义（如"修一下"可能是 fix
     也可能是 deliver）→ 按"更重一侧"路由并向 owner 确认一次（默认动作=问，不猜）
-  ambiguity_rule: "宁可多问一次，不可猜错分类（问的成本 << 错路由的返工成本；注意
-    账本无此项——一次性澄清并入 intent_ratification 的交互预算）"
+  ambiguity_rule: "宁可多问一次，不可猜错分类（问的成本 << 错路由的返工成本；一次性澄清
+    并入 intent_ratification 的类目预算——不新增账本类目，conservation_rule 的类目语义，
+    ADR-0022 消除账外阻塞点歧义）"
   demotion: 载体执行中发现分类过重（trivial 卡实为 deliver 面）→ amendment.classify
     重新分卡（非 normative，auto + owner 抽检 10%）；升重不可逆（trivial→logic 后
     不因"改完了"降回）

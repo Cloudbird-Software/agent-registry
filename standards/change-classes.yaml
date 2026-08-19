@@ -9,7 +9,7 @@ classes:
     scope: 注释/README/文档措辞
     card: optional
     gate: [lint]
-    review: none
+    review: "none（review.waived——dispatch 表，ADR-0022）"
     merge: integrator auto
   trivial:                          # ADR-0014：fix 意图的载体类（自明验收）
     scope: 单点修复/文案/小改——对错在意图中说清（"错在哪即对在哪"）
@@ -42,20 +42,22 @@ classes:
     scope: 依赖新增/升级
     card: required
     gate: [unit, acceptance, sca, license-check, hash-pin]
-    review: owner_ratify          # 幻觉依赖/抢注是一人公司真实高频风险
+    review: "test_author review + owner_ratify 第三钥（幻觉依赖/抢注是一人公司真实高频风险；
+      dispatch 表——ADR-0022）"
     merge: integrator auto（owner 批后）
   schema:
     scope: 数据库 schema/接口契约
     card: required
     gate: [unit, acceptance, migration-dry-run, backup-verified]
-    review: owner_ratify
+    review: "test_author review + owner_ratify 第三钥（dispatch 表——ADR-0022）"
     reversibility: required       # 必须附可执行回滚
     merge: integrator auto（owner 批后）
   prod:
     scope: 生产环境变更
     card: required
     gate: [smoke, canary]
-    review: owner_per_action      # RL-1；=flag 开启/环境审批（non_delegable）
+    review: "test_author review + owner_per_action（RL-1；=flag 开启/环境审批 non_delegable——
+      生产动作审批发生在 integrate 之后，verify 出边不因其阻塞；dispatch 表，ADR-0022）"
     merge: "release_bot behind flag（自动+写 release_record）；flag 开启=owner；sev1 前进修复=incident_cell.deployer（owner_required）"
 expedited:
   rule: 允许降级走快速道，但必须 N<=3 天内补 retro-ADR；curator 追踪为带期限的债（与 incident retro 债同机制）

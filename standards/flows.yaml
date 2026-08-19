@@ -73,7 +73,11 @@ maintain_loop:
   problem: 周扫（drift-check/CT/dependabot/scorecard）产 issue 后，若靠 owner 记得手动
     起人修——issue 会躺在列表里腐烂；维护是系统的代谢，不是人的待办
   issue_lifecycle:                  # issue 是 backlog 的前端展示，不是独立队列
-    open: 扫描器自动开（含指标/证据/期望状态引用）
+    open: "外部扫描器自动开（含指标/证据/期望状态引用）——dependabot/scorecard 平台带外
+      （显式依赖，体系外）；supply-audit（checks.yaml planned）激活后并入。本仓内机制
+      不自开 issue：drift-check 产 drift 报告经 owner 周审转 proposals、CT 失败经
+      adversary findings、escape 经 owner——入口收敛于外部扫描器（ADR-0022 显式化，
+      issue #31 C-4）"
     triage: curator 周审转 backlog.proposals（多写者→单写者归并；severity 标注）
     consumed: planner 组波次 producer_gate 必处置 top-k（纳入/驳回+理由/延期+条件）
     closed: 修复 PR 关 issue + 复绿证据（check 复跑通过）——无复绿证据不得关

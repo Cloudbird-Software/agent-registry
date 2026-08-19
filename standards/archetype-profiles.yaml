@@ -91,6 +91,8 @@ profiles:
     capabilities:
       allow: [fs_read, fs_write_repo, vcs_read, datastore_read, datastore_write, memory_read, memory_write]
       agent_tools: {allow: [researcher], max: 2}
+    io_guarantees:                    # ADR-0022：输出契约语义约束（validate 强制——防 schema 被换掉致契约链断裂）
+      output_must_have: [wave_id, cards, contracts_ref, trace_id]   # cards=工作卡数组（card.trace_id→task-in 链路闭合）
     isolation: private
     approval: auto
     duty_assurance:
@@ -222,7 +224,9 @@ profiles:
     mission: 把全部 structural claim 从断言变成被持续验证的事实；对新卡做 premortem
     internal_flow:
       1. 从 control-tests.yaml 取清单，逐条以目标原型真实凭据尝试越权，期望"失败"
-      2. 期望失败却成功 → 开 P0 事件 + 冻结相关流程 + 通知 owner
+         （凭据=平台签发的一次性目标原型凭据副本，见 credential.impersonation——ADR-0022）
+      2. 期望失败却成功 → 写 P0 finding + 发 freeze 建议标志（平台执行冻结——adversary
+         自身无冻结凭据，与 workflows/red-adversary.steps.md 第 5 步一致）+ 通知 owner
       3. premortem：对新卡/新计划出失败模式清单（不出 pass/fail 判决）
       4. findings 只进数据层 findings/**，不直接开 PR、不直接改事件
     typical: {model_tier: deep, memory: [episodic 攻击史], workspace: 一次性沙箱}

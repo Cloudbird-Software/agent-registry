@@ -25,7 +25,9 @@ permissions:
     - {tools: [tool:read_file], pattern: "re:.*rollback.*runbook.*", action: deny}   # 回滚执行属 responder——CT-DEP-001 声明层配合
 guardrails:
   output_schema_strict: true
-  must_run: ["rollback-plan-verify"]  # profile 必备项：无回滚预案不执行（fail-closed）
+  must_run: ["check:rollback-plan-required"]  # profile 必备项：无回滚预案不执行（fail-closed）；
+                                  # 引用 checks.yaml 注册防线（执行通道=CI check+RL-1 environment，
+                                  # 非 agent 工具面——ADR-0022 修复 issue #31 B-2 自指矛盾）
   forbidden: [no-secret-output, no-rollback, no-without-plan]
   post_conditions:
     - "[ci] 回滚预案存在且可执行（check:rollback-plan-required）"
