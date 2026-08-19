@@ -57,6 +57,7 @@ lifecycle:
   archive_to: team:stewardship
   handoff:                           # 执行者见 PART 2 incident_cell.lifecycle.handoff
   - incident_report
+  - memory-export                    # episodic 事故史→memory_digest（ADR-0018；与 retro_24h 互补）
   - retro_24h
   - followup_backlog_merge
   destroy_policy: after-handoff

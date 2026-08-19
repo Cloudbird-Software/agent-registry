@@ -206,3 +206,91 @@ def test_ephemeral_missing_archive_to_fails(tree: Path):
     del data["lifecycle"]["archive_to"]
     dump_yaml(p, data)
     assert_rejected(run_validate(tree), r"team:dev-wave 是 ephemeral 但未声明 archive_to")
+
+
+# ── 负向：上下文装配/记忆契约（ADR-0018）─────────────────────────
+def test_archetype_without_assembly_fails(tree: Path):
+    """LLM 原型缺装配清单 = 启动上下文未声明，必须被拒绝"""
+    p = tree / "standards" / "context-assembly.yaml"
+    data = load_yaml(p)
+    del data["assembly"]["builder"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"builder 无装配清单")
+
+def test_assembly_component_out_of_vocab_fails(tree: Path):
+    """装配组件不在词表 = fail-closed 违反，必须被拒绝"""
+    p = tree / "standards" / "context-assembly.yaml"
+    data = load_yaml(p)
+    data["assembly"]["builder"]["components"].append("secret_dump")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"builder 装配组件.*secret_dump.*不在组件词表")
+
+def test_memory_view_contract_mismatch_fails(tree: Path):
+    """judge 装配 memory_view 但记忆契约为空 = 组件⟔契约矛盾，必须被拒绝"""
+    p = tree / "standards" / "context-assembly.yaml"
+    data = load_yaml(p)
+    data["assembly"]["judge"]["components"].append("memory_view")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"judge 装配了 memory_view 但记忆契约为空")
+
+def test_memory_type_out_of_enum_fails(tree: Path):
+    """记忆类型不在 types_enum = fail-closed 违反，必须被拒绝"""
+    p = tree / "standards" / "context-assembly.yaml"
+    data = load_yaml(p)
+    data["memory"]["per_archetype"]["builder"]["types"].append("procedural")
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"builder 记忆类型.*procedural.*不在 types_enum")
+
+def test_ephemeral_missing_memory_export_fails(tree: Path):
+    """ephemeral 团队 handoff 缺 memory-export = 素材随销毁消失，必须被拒绝"""
+    p = tree / "registry" / "teams" / "dev-wave.yaml"
+    data = load_yaml(p)
+    data["lifecycle"]["handoff"] = [x for x in data["lifecycle"]["handoff"] if x != "memory-export"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"team:dev-wave ephemeral 但 handoff 缺 memory-export")
+
+def test_digest_schema_dangling_fails(tree: Path):
+    """memory.digest.schema 悬空 = 素材契约无 schema，必须被拒绝"""
+    p = tree / "standards" / "context-assembly.yaml"
+    data = load_yaml(p)
+    data["memory"]["digest"]["schema"] = "schemas/no-such-digest.json"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"memory.digest.schema 文件不存在")
+
+
+# ── 负向：开源项目清单（ADR-0018 供应链）─────────────────────────
+def test_tool_repo_not_in_projects_fails(tree: Path):
+    """工具实现 repo 不在清单 = 供应链漂移（org 名/仓名漂移在此灭绝）"""
+    p = tree / "registry" / "tools" / "bash.yaml"
+    data = load_yaml(p)
+    data["implementation"]["repo"] = "ghost-org/typo-repo"
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"tool:bash implementation.repo 'ghost-org/typo-repo' 不在 registry/projects.yaml")
+
+def test_tool_without_implementation_repo_fails(tree: Path):
+    """工具缺 implementation.repo = 实现不可溯源，必须被拒绝"""
+    p = tree / "registry" / "tools" / "bash.yaml"
+    data = load_yaml(p)
+    del data["implementation"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"tool:bash 无 implementation.repo")
+
+def test_project_dead_entry_fails(tree: Path):
+    """清单条目无任何消费者 = 死条目即漂移，必须被拒绝（与 ct-coverage 反向同模式）"""
+    p = tree / "registry" / "projects.yaml"
+    data = load_yaml(p)
+    data["projects"].append({
+        "repo": "org/unused-dep", "role": "x", "license": "MIT",
+        "pin_policy": "deploy-time-pin",
+        "audit": {"tool": "osv-scanner", "schedule": "weekly"},
+    })
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"org/unused-dep 无任何消费者")
+
+def test_project_missing_license_fails(tree: Path):
+    """清单条目缺 license = 不可审计，必须被拒绝"""
+    p = tree / "registry" / "projects.yaml"
+    data = load_yaml(p)
+    del data["projects"][0]["license"]
+    dump_yaml(p, data)
+    assert_rejected(run_validate(tree), r"openJiuwen-ai/jiuwenswarm 缺 license")

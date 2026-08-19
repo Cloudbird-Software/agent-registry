@@ -67,3 +67,17 @@ checks:
     status: planned
     where: case_law 入库时非规范标注（curator）——随 case_law 激活
       （on_trigger：judge 争议累计 >= 5；未激活无判例可标）
+
+  - id: spawn-manifest-conformance
+    status: active
+    consumed_externally: true
+    where: 声明层=validate.py（装配覆盖/组件词表/记忆契约一致性——ADR-0018 实装）；
+      平台侧=template_service 编排模板注入收敛（spawn 只注入清单内组件，
+      清单外注入=平台违规——随模板仓落地，声明层先行）
+
+  - id: supply-audit
+    status: planned
+    consumed_externally: true
+    where: CI-Workflows 定时任务（osv-scanner/renovate 扫 registry/projects.yaml
+      登记的 git 依赖与各仓 lockfile；Dependabot 不识别 YAML 清单故由扫描 job
+      消费；发现→maintain_loop issue——ADR-0018 登记，待平台仓实装）

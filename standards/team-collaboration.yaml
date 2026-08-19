@@ -190,8 +190,10 @@ teams:                               # 团队原型（team = seats 容器 + scop
         team_side:                    # 队侧（destroy 前，相位 handoff）
           - {item: artifacts-pr, by: "mechanism:git（已合并 PR 天然留存）"}
           - {item: trace-archive, by: "mechanism:metrics-aggregator（事件流归档）"}
+          - {item: memory-export, by: "seat:planner + seat:test_author（memory_digest 导出——context-assembly memory.digest；先于 workspace 销毁）"}
           - {item: retrospective, by: "seat:test_author（handoff 相位在场）"}
-        stewardship_side: [memory-distill, adr-write]   # curator 消费归档资产执行（蒸馏入库/关键决策→ADR）
+        stewardship_side: [memory-distill, adr-write]   # curator 消费归档资产执行（蒸馏入库/关键决策→ADR；
+                                      # memory-distill 素材面=memory_digest 制品——ADR-0018）
       destroy: "after-handoff(team_side) AND (released_behind_flag OR reverted)"
       destroy_scope: "销毁=agent 实例与临时 workspace；数据层事件/制品不随队销毁（stewardship_side 据此异步消费）"
   stewardship:
@@ -232,6 +234,7 @@ teams:                               # 团队原型（team = seats 容器 + scop
       handoff:                        # followup_cards 经 backlog.proposals 由 curator 归并（不是孤立文档）
         team_side:
           - {item: incident_report, by: "seat:responder"}
+          - {item: memory-export, by: "seat:responder（episodic 事故史→memory_digest；与 retro_24h 互补——retro 记事件，digest 记可复用认知）"}
           - {item: retro_24h, by: "seat:responder"}
         stewardship_side: [retro_debt_tracking, followup_backlog_merge]
       destroy: "exit_criteria 满足（followup_cards_created 是必要条件——修复不停留在 retro 文档）"
@@ -325,6 +328,12 @@ artifacts:                           # 制品=一切跨阶段/跨团队传递的
     producer: mechanism:evidence-pack（重跑争议测试/采日志与哈希 → 不可变）
     fields: [card, acceptance_criteria, 相关 contract, 失败断言 id+原始输出,
              双方主张（结构化字段，禁自由文本）, version_read]
+  memory_digest:                     # 记忆蒸馏素材（ADR-0018：交接链的素材契约）
+    producer: handoff 相位在场座位（context-assembly memory.digest）
+    fields: [team_id, wave_id, trace_refs, distilled_lessons, reusable_facts, source_refs]
+    schema: registry/schemas/memory-digest.json
+    note: 落数据层；先于 workspace 销毁产出；不随 30d 轨迹清理
+      （curator memory-distill 的唯一素材面——素材不可能先于消费者消失）
   release_record:                    # release_bot 于每次部署 behind flag 时写入
     fields: [rollback_safe, rollback_window, flag_ids, wave_id]
     note: "rollback_safe=false 当且仅当发布含 contract 相迁移/不可逆副作用"
@@ -417,6 +426,7 @@ activation:
     - budget（三层+invariants）
     - write_exclusion + phases（状态机与写锁）
     - card_gate + card 模型（fields/types/knowledge_refs）+ amendment_request
+    - context-assembly（spawn manifest+记忆契约——编排层被依赖即工作；validate 声明层已生效，ADR-0018）
     - attention_ledger
     - release_record（rollback_safe——P0 数据安全）
     - interfaces 双强制点（backlog producer_gate/consumer_gate）

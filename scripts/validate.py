@@ -177,6 +177,43 @@ for _prof in PROFILES.values():
 for _ct in set(CT_REG) - _referenced:
     fail(f"control-tests.yaml 登记 {_ct} 未被任何 profile structural 引用（ct-coverage 反向，一一对应）")
 
+# ---- 上下文装配与记忆契约（ADR-0018）----
+# spawn manifest：装配覆盖一切 LLM 原型；组件 ⊆ 词表；memory_view ⟺ 记忆类型非空。
+# simulate 测相位/权限/预算、gate 测产品代码——本块管"agent 启动时拿到什么"的声明层。
+CA = load_yaml(ROOT / "standards" / "context-assembly.yaml") or {}
+CA_COMPONENTS = set((CA.get("components") or {}).keys())
+CA_ASSEMBLY = CA.get("assembly") or {}
+CA_MEM = (CA.get("memory") or {}).get("per_archetype") or {}
+CA_MEM_ENUM = set((CA.get("memory") or {}).get("types_enum") or [])
+if not CA:
+    fail("standards/context-assembly.yaml 缺失或解析为空（ADR-0018——启动上下文未声明）")
+for arch in LLM_ARCHETYPES:
+    entry = CA_ASSEMBLY.get(arch)
+    if not isinstance(entry, dict) or not entry.get("components"):
+        fail(f"context-assembly: LLM 原型 {arch} 无装配清单（spawn manifest 缺失——启动上下文未声明，ADR-0018）")
+        continue
+    comps = entry.get("components") or []
+    bad = [c for c in comps if c not in CA_COMPONENTS]
+    if bad:
+        fail(f"context-assembly: {arch} 装配组件 {bad} 不在组件词表（fail-closed，ADR-0018）")
+    mtypes = set((CA_MEM.get(arch) or {}).get("types") or [])
+    if ("memory_view" in comps) != bool(mtypes):
+        why = "装配了 memory_view 但记忆契约为空" if "memory_view" in comps else "记忆类型非空但未装配 memory_view"
+        fail(f"context-assembly: {arch} {why}（组件⟔契约矛盾，ADR-0018）")
+    badt = mtypes - CA_MEM_ENUM
+    if badt:
+        fail(f"context-assembly: {arch} 记忆类型 {sorted(badt)} 不在 types_enum（fail-closed）")
+for arch in set(CA_ASSEMBLY) | set(CA_MEM):
+    if arch not in LLM_ARCHETYPES:
+        fail(f"context-assembly: {arch} 不是 LLM 原型（装配/记忆契约只覆盖 LLM 原型——机制无 spawn 上下文）")
+_dgs = (((CA.get("memory") or {}).get("digest") or {}).get("schema")) or ""
+if _dgs:
+    _dgp = (REG / _dgs).resolve()
+    if not _dgp.is_relative_to(REG.resolve()):
+        fail(f"context-assembly: memory.digest.schema 逃逸 registry 目录: {_dgs}")
+    elif not _dgp.is_file():
+        fail(f"context-assembly: memory.digest.schema 文件不存在: {_dgs}")
+
 # ---- agent 校验 ----
 for aid, a in agents.items():
     arch = a.get("archetype")
@@ -386,6 +423,8 @@ for tm, t in teams.items():
             fail(f"team:{tm} 的 archive_to 不是 persistent 团队: {target}")
         if not life.get("handoff"):
             fail(f"team:{tm} 是 ephemeral 但未声明 handoff")
+        elif "memory-export" not in [str(x) for x in (life.get("handoff") or [])]:
+            fail(f"team:{tm} ephemeral 但 handoff 缺 memory-export（记忆素材须先于 workspace 销毁过界——ADR-0018）")
 
 # ---- tool owner 校验 ----
 for tid, t in tools.items():
@@ -394,6 +433,45 @@ for tid, t in tools.items():
         ot = owner.removeprefix("team:")
         if ot not in teams or teams[ot].get("lifecycle", {}).get("type") != "persistent":
             fail(f"tool:{tid} 的 owner 不是 persistent 团队: {owner}")
+
+# ---- 开源项目清单（ADR-0018：供应链单一真源）----
+# 工具实现与网关 upstream 必须先入清单（fail-closed——org 名/仓名漂移在此灭绝）；
+# 条目必填审计字段（无审计计划=死清单）；反向：无消费者的条目=死条目。
+PROJECTS_DOC = load_yaml(REG / "projects.yaml") or {}
+_proj_repos: set = set()
+for _pr in PROJECTS_DOC.get("projects") or []:
+    if not isinstance(_pr, dict):
+        fail(f"projects.yaml 存在非对象条目: {_pr!r}")
+        continue
+    _repo = _pr.get("repo")
+    if not (isinstance(_repo, str) and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", _repo)):
+        fail(f"projects.yaml 条目 repo 非法: {_repo!r}（须 owner/name）")
+        continue
+    _proj_repos.add(_repo)
+    for _f in ("role", "license", "pin_policy"):
+        if not _pr.get(_f):
+            fail(f"projects.yaml 条目 {_repo} 缺 {_f}（清单即审计对象——字段残缺=不可审计）")
+    _aud = _pr.get("audit") or {}
+    if not (isinstance(_aud, dict) and _aud.get("tool") and _aud.get("schedule")):
+        fail(f"projects.yaml 条目 {_repo} 缺 audit.tool/schedule（无审计计划=死清单）")
+if not _proj_repos:
+    fail("registry/projects.yaml 清单为空或缺失（ADR-0018——工具实现引用无处收敛）")
+_repo_consumers: set = set()
+for tid, t in tools.items():
+    _repo = (t.get("implementation") or {}).get("repo")
+    if not _repo:
+        fail(f"tool:{tid} 无 implementation.repo（实现不可溯源——ADR-0018）")
+        continue
+    _repo_consumers.add(_repo)
+    if _repo not in _proj_repos:
+        fail(f"tool:{tid} implementation.repo '{_repo}' 不在 registry/projects.yaml（供应链漂移——ADR-0018）")
+_up_repo = (((load_yaml(REG / "models.yaml") or {}).get("gateway") or {}).get("upstream_runtime") or {}).get("repo")
+if _up_repo:
+    _repo_consumers.add(_up_repo)
+    if _up_repo not in _proj_repos:
+        fail(f"models.yaml gateway.upstream_runtime.repo '{_up_repo}' 不在 registry/projects.yaml（供应链漂移——ADR-0018）")
+for _repo in sorted(_proj_repos - _repo_consumers):
+    fail(f"projects.yaml 条目 {_repo} 无任何消费者（tool/gateway 皆未引用——死条目即漂移）")
 
 # ---- check:* 注册表校验（ADR-0012：悬空防线不可声明；ADR-0013：条目结构硬化）----
 # standards/ 与 registry/ 中一切 check:<id> 引用必须 ∈ standards/checks.yaml（fail-closed）。
