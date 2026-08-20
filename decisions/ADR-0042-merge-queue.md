@@ -46,3 +46,17 @@ update branch。硬性前提：required check 链路上的 workflow 必须订阅
 ## 测试（T1 语义冲突拦截 / T2 merge_group 上报 / T3 并发吞吐 / T4 对账）
 按卡内预设执行；T1 需要构造相互冲突的两 PR（改同函数返回类型 vs 按旧类型
 调用），在 agent-registry 上以 decisions/ 文档冲突形态等价执行。
+## 修订（2026-08-20）：org 级 → repo 级 ruleset
+
+实施时实测：org rulesets API（REST 与 GraphQL）均不接受 merge_queue 规则类型
+（"Invalid rules: 'Merge queue'"）；merge_queue 必须与 pull_request /
+required_status_checks 同处一个 ruleset，且 merge_method 须为仓库允许的
+squash（MERGE 被拒）。决策 1 修正为：
+
+- merge queue 以 **repo 级 ruleset**（名 `merge-queue`）存在于各目标仓，
+  含三个规则（pull_request / required_status_checks[gate] / merge_queue）
+- 声明与对账模式对齐 P1-1 repo settings：`expected-state.json#merge_queue`
+  （repos + params）为真源，drift-check §14 对账（含未声明仓私自开队列的
+  EXTRA 检查），apply.sh step6 幂等修复（GraphQL 写入）
+- 两仓已建（agent-registry 21076429 / template-service 21076438），参数与
+  本 ADR 决策 1 一致（squash、串行保守起步）
