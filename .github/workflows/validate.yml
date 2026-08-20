@@ -1,5 +1,9 @@
 name: gate  # ruleset required check 名为 gate（同 CI-Workflows 自测做法）
 on:
+  merge_group:
+    # P2-7（ADR-0042）：merge queue 必需——不订阅 checks_requested 则队列中 required
+    # check 永不上报、合并直接失败。非 PR 事件走 main 面校验（PR 专属步骤按 if 跳过）
+    types: [checks_requested]
   pull_request:
     # edited（qodo review #1，CI-Workflows #8 同款加固）：adr-required/standards-diff
     # 消费可变的 PR title/body——不订阅 edited 则作者可在 check 通过后编辑掉
