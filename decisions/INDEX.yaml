@@ -499,7 +499,7 @@ entries:
     lifecycle: active
     decision_status: accepted
     archive_path: adr/ADR-0069-live-drill-seed-defects.md
-    content_sha256: 4af9e2a0636303eea881a4a4f2b181dc37487132b89d6bf0a0fbe9af951ef988
+    content_sha256: 4bb3527b47a623b623a0e032d1e76f1c8f0b241a447562cd6d00ac5db0f06651  # rev1（W4-C4 .github#223 实现落地澄清，archive PR#5）
   - number: 70
     title: "整洁关卡组全量——结构 + AI 导航 + 抗复杂度 + 棘轮"
     file: ADR-0070-tidiness-gates-full-set.md
