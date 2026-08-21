@@ -1,0 +1,195 @@
+# migrate_overrides.yaml —— ADR 生命周期 override + 墓碑一句话摘要（W1-C1/ADR-0053）
+#
+# 约定（ADR-0053）：
+#   - 缺省 lifecycle: active（保守——拿不准一律 active）。
+#   - superseded 必填 superseded_by（指向现行有效的承接 ADR）+ rationale；
+#     archived 必填 rationale；判断依据须可复核（引用取代 ADR 的原文条款）。
+#   - summary：墓碑正文的一句话决策摘要（全部条目必写——墓碑的可读性底线）。
+#   - 主键 = 原文件名（与 decisions/ 一一对应，不重命名）。
+#
+# 分类结果（2026-08-21 逐个通读 52 个 ADR）：
+#   active 46 / superseded 4 / archived 2
+
+ADR-0001-agent-registry-establishment.md:
+  summary: 建立 agent-registry 单一真源仓，四类声明（agents/skills/tools/teams）+ models.yaml 落盘，L0→L3 分层只以 id 引用，注册条目 proposed→approved 必须走 PR。
+
+ADR-0002-llm-gateway.md:
+  summary: 模型接入经 LLM Gateway 常驻服务，models.yaml 只声明 alias→路由组+配额，key 一次性注入 gateway secret store；rev1 部署配置落本仓 deploy/llm-gateway 并与 alias 集合对齐校验。
+
+ADR-0003-process-data-tiering.md:
+  summary: 过程数据三分离——声明与决策进 git、结构化事件进 JSONL→SQLite/PG、原始轨迹进对象存储滚动 30 天清理；项目仓 clone 不携带过程数据。
+
+ADR-0004-team-lifecycle-handoff.md:
+  summary: 团队分 ephemeral/persistent 两类；ephemeral 销毁前必须完成 handoff 动作清单（artifacts-pr/memory-distill/skill-extract 等），destroy_policy: after-handoff。
+
+ADR-0005-hard-vs-soft-control.md:
+  summary: 软硬双层控制——AGENTS.md/提示词是软引导，工具白名单/权限引擎/凭据作用域/平台防线是硬强制，冲突时硬控制优先。
+
+ADR-0006-governance-change-control.md:
+  summary: 治理仓变更分级 C1（PR+ADR）/C2（PR+validate）/C3（PR）；破玻璃 admin 直推 24h 内回填 ADR+PR；drift-check §8 直推检测上线。
+
+ADR-0007-archetype-verification-chain.md:
+  lifecycle: superseded
+  superseded_by: ADR-0010
+  rationale: 七分类与 AR-9 三层验证链被 archetype v2（ADR-0008）→ Governance v3（ADR-0010）重构取代，0010"被推翻的先前决策"表显式列出 ADR-0007 的 checker 评审计划条款；no-self-test 原则经 0008/0010 传承。
+  summary: archetype 七分类（builder/checker/orchestrator/curator/interface/observer/operator）+ 三层验证链（agent 内 guardrails/team 内独立 checker/team 外审计）+ no-self-test 禁则。
+
+ADR-0008-archetype-v2-ten.md:
+  lifecycle: superseded
+  superseded_by: ADR-0010
+  rationale: 十原型 LLM 化被 ADR-0010 重构（checker→test-author+verifier、operator→deployer+responder 拆分，orchestrator/interface/observer 降为机制原型）；planner=设计时、researcher as_tool 等仍有效结论由 0010 承接。
+  summary: archetype v2：从 orchestrator 拆出 planner（设计时）、新增 judge（严格管辖域+族独立）与 researcher（as_tool 上下文经济），十原型封顶（第 11 个须 ADR 论证）。
+
+ADR-0009-archetype-profiles.md:
+  lifecycle: superseded
+  superseded_by: ADR-0010
+  rationale: profiles v1 机制（forbidden_* 黑名单/permissions_mode 双义/structural 字符串形式）被 ADR-0010 v2 全部取代（推翻表："全部由 v2 取代"）；profile 六要素框架本身经 v2 延续。
+  summary: profiles 机制：每原型六要素内部结构标准（mission/internal_flow/typical/structural/verified_by）+ 机器强制字段 + validate.py 强制清单；结构性保证优先于验证性保证。
+
+ADR-0010-governance-v3.md:
+  summary: Governance v3：威胁模型重排（意图失真>供应链>成本>治理过重>合谋），副作用白名单制，checker/operator 双拆分，LLM/机制二分（9 LLM+6 机制+owner），adversary+控制测试，意图批准与逃逸闭环，平台锁。
+
+ADR-0011-runtime-egress-monitoring-and-scorecard.md:
+  summary: Runner 运行时出网监控起步（四个 reusable workflow+automerge 首步插 harden-runner audit，阶段二收敛 allowlist 切 block）+ OpenSSF Scorecard 周扫三治仓（advisory 不进 gate）。
+
+ADR-0011-team-collaboration-v1.md:
+  summary: 团队协作标准 v1.0：四协作范式（含 artifact_mediated）/相位机/attention-ledger（同步≤2 守恒），simulate-wave 12 场景彩排为 CI required；双子代理独立复跑修复 9 条 P0。
+
+ADR-0012-team-schema-v2-and-checks-registry.md:
+  summary: team.schema v2 对齐实例语义（destroy_condition/coverage 枚举等）+ standards/checks.yaml check:* 防线注册表 fail-closed 双向校验；ADR-0011 双档消歧约定（引用带主题限定，新 ADR 自 0012 顺延）。
+
+ADR-0013-redteam-remediation.md:
+  summary: 红队一批修复：validate.py 元验证测试套件（正向全绿+逐项负向注入）、checks 注册表硬化、adr-required check 实装转 active（CT-CUR-003 闭环）、ADR 编号唯一性机器检查（0011 双档唯一豁免）。
+
+ADR-0014-intent-routing.md:
+  summary: 组织级流程显式化：意图八分类路由表（R1 一台状态机/R2 owner 从不启动/R3 注意力只花新对错）+ 验收三分法 + trivial/spike 载体类 + 维护回路五态（issue 不可能躺在列表里）。
+
+ADR-0015-scenario-engine.md:
+  summary: 场景引擎与测试底层方法统一：一切测试=事件进→事件出→断言不变式；scenarios.yaml 声明式断言（A1-A7 原语+op 五种）+ CT 双层链接（scenario 声明层先决/runtime 三分类）。
+
+ADR-0016-redteam-remediation-batch2.md:
+  summary: 红队二批：三治仓声执一致修复（CI-Workflows adr-required 实装、v1 指针完整性 §11、event.schema v1.1 十一类、§10 ADR 实体性、漂移评论指纹去重）；附录确立 direct_push_exemptions 逐 SHA 豁免机制（勘误收窄为个案追认）。
+
+ADR-0017-github-bootstrap-direct-push-backfill.md:
+  lifecycle: archived
+  rationale: .github 两次 admin 直推（Trae IDE 分享 zip + 误入 agent-registry gitlink）的一次性破玻璃回填，事件已闭环且 7 天报警窗已过；expected-state 豁免条目仍以本 ADR 为登记背书（历史事实，非持续义务）。
+  summary: .github 破玻璃直推回填：9b056b3a/416f5f5 定性为 IDE 会话产物误直推（非初始建仓导入——勘误收窄豁免语义为个案 ADR 追认，不可泛化），教训=IDE 产物目录与兄弟仓克隆不得随治理变更提交。
+
+ADR-0018-context-assembly-memory-and-supply-chain.md:
+  summary: 上下文装配清单（7 组件词表+每 LLM 原型有序 manifest，多给少给同违规）+ 记忆契约与 memory_digest 制品（curator 素材面唯一化）+ 开源项目清单 projects.yaml（implementation.repo fail-closed）。
+
+ADR-0019-repo-visibility-public.md:
+  lifecycle: superseded
+  superseded_by: ADR-0020
+  rationale: agent-registry 单仓公开修正被 ADR-0020 组织全仓公开政策整体吸收，且其"私有仓可在 REPOS.yaml 标 exempt"条款被 0020 显式废除（exempt 只豁免治理基线不豁免可见性）。
+  summary: agent-registry 可见性申报修正为 public（错误期望状态 private 曾致每次公开都报假漂移）；全公开由惯例升为明示政策的起点。
+
+ADR-0020-org-wide-public-visibility-and-hourly-drift.md:
+  summary: 组织全仓公开政策（无可见性豁免路径，私有须新 ADR 推翻）+ drift-check §7 双向升级（申报侧 policy 校验+线上全量遍历不依赖申报完整性）+ 检测频率升每小时。
+
+ADR-0021-redteam-batch3-and-governance-test-loop.md:
+  summary: 红队三批：声明层 6 类死锁/矛盾修复（memory-export 执行者/no_release_face/owner 缺席默认动作/retries.exhausted 回炉/僵持判据/边界公理）+ 机制命名绑定单一真源 + 幽灵角色检测 + 四仓治理测试回路。
+
+ADR-0022-registry-gate-hardening.md:
+  summary: 注册层门禁硬化（issue #31 审计收敛 1-10）：validate.py 15 条语义防线——capability 白名单（K-Q 越权全拦）、must_run/allow 执行通道三词表、断言下限、相位可达性求解、flow_ref fail-closed、JSON Schema 语法校验等。
+
+ADR-0023-ai-web-school-governance-onboarding.md:
+  summary: AI_Web_School 解除全部豁免转入 active 纳管（ruleset/expected-state/REPOS.yaml 四处解除 + gate/dependabot/automerge/App/env 落地）；Python 存量栈一次性语言豁免（仅新服务选型受限）。
+
+ADR-0024-use-up-plan-bootstrap-onboarding.md:
+  summary: Use-up-Plan 建仓申报入图（L2/public/active）+ 两条 bootstrap 直推 commit 逐完整 SHA 豁免登记 + 平台配套补全（production env/App 挂载）。
+
+ADR-0025-agent-platform-bootstrap.md:
+  summary: agent-platform 立项：agent-registry 声明渲染到 openjiuwen 运行时的执行层（渲染器/workflow 编译器/机制执行面/TUI）；上游零 fork 零 submodule，PyPI wheel 钉版+Docker 预装重二进制。
+
+ADR-0026-dep-review-license-exemption-passthrough.md:
+  summary: dep-review 增 allow-dependencies-licenses 可选透传输入——依赖图许可证归一化误报（LGPL 前缀伪影）按 PURL 精确豁免，org deny 清单本体不变。
+
+ADR-0027-mutual-gobaml-rewrite-onboarding.md:
+  summary: mutual 立项：LLM 双向互惠推荐引擎（NSW 匹配+envy-freeness+HR@K/NDCG@5 门禁）按 Go+BAML 重写入组织；Python 存量为一次性导入豁免（仅重写参照+golden fixtures 来源）。
+
+ADR-0028-use-up-plan-go-language-baseline.md:
+  summary: Use-up-Plan 应用层语言基线 Go 1.25.1（修正 ADR-0024 的 TypeScript 记载）：移除模板 TS 脚手架，CI runtime node→go，depcruise 由自研 tools/archlint 替代。
+
+ADR-0029-allow-auto-merge-reconciliation.md:
+  summary: allow_auto_merge 纳入 expected-state repo_baseline 全仓对账（drift-check §4 断言+apply.sh step5 幂等修复；字段读不到按漂移 fail-closed）——开关静默掉落即自动合并全链路失效的盲区关闭。
+
+ADR-0030-agent-registry-gitlink-breakglass-backfill.md:
+  lifecycle: archived
+  rationale: agent-registry gitlink 误入事件的破玻璃回填，处置完毕无持续义务；确立的"破玻璃直推解锁 CI 死锁+ADR 回填"范式已沉淀为流程知识；豁免条目以本 ADR 为登记背书（历史事实）。
+  summary: agent-registry gitlink 误入直推（60bd155 加入/e9424d2 移除）定性破玻璃回填：gitlink 曾封死全部 PR 的 base 检出（CI 死锁），解锁唯一路径=破玻璃直推；确立同型事件处置范式。
+
+ADR-0031-remove-thread-resolution-deadlock.md:
+  summary: required_review_thread_resolution 拆除（无人团队的永久 pending 死锁）+ bot-channels 规范：机器意见只走 check run annotation/普通评论，禁止创建 review thread 与自我授权。
+
+ADR-0032-gate-aggregator-strict-skipped-not-success.md:
+  summary: gate aggregator 严格化：result != "success" 即红（skipped/cancelled/timed_out 全红），结构性预期跳过以 EXPECTED_SKIP 白名单显式登记，required 链路禁 workflow 级 paths 过滤。
+
+ADR-0033-governance-drift-pipefail.md:
+  summary: governance-drift 检测步骤加 set -o pipefail——bash -e 下 `drift-check | tee` 管道退出码恒 0 曾致"漂移自动开 issue"机制整体失效（run 32331351942 实证）。
+
+ADR-0034-required-check-liveness-and-pr-stuck-detection.md:
+  summary: drift-check §12 required check 活体验证（文本对账≠生效验证：job 改名即"零 required check"裸奔）+ §13 PR liveness 侦测（auto-merge 挂起/check 停滞/零 check 三类卡死），阈值入期望状态。
+
+ADR-0035-test-integrity-gate.md:
+  summary: test-integrity 门（regex 级）：测试文件删除/断言计数净降/新增抑制标记/期望值改写四规则命中即红；ADR 逃生门豁免计数入账；fail-closed（base/head/policy 拉取失败一律红）。
+
+ADR-0036-suppression-marker-budget-gate.md:
+  summary: 抑制标记预算门：标记全集落 policy（noqa/type:ignore/gitleaks:allow 等正则+文件类），单 PR 净增>3 红、全仓总量棘轮只降不升；越界走 ADR 逃生门并负棘轮同步义务。
+
+ADR-0037-diff-coverage-gate.md:
+  summary: diff coverage 门 80%：PR 变更行（merge-base diff +行）∩覆盖行，lcov/istanbul/Cobertura/go covprofile 四格式统一解析；阈值真源 .github policy，业务仓不得自行放宽；X-01 全局口径维持拒绝。
+
+ADR-0038-contract-compatibility-gate.md:
+  summary: 契约兼容门：OpenAPI breaking（oasdiff --fail-on WARN 从严）+ JSON Schema breaking 结构分类器 + destructive DDL 检测（ADR 引用+回滚脚本逆操作双要求）；policy 失明防护（声明路径零命中即红）。
+
+ADR-0039-dependency-supply-chain-policy.md:
+  summary: 依赖供应链 policy：许可证改白名单拒绝式、新增依赖包龄<90 天硬红、幻觉包 registry 404 硬红、低下载/单维护者/install 脚本需 ADR、manifest↔lockfile 静态一致性+各仓 frozen 安装执法。
+
+ADR-0040-auto-fix-limit-and-cost-circuit-breaker.md:
+  summary: auto-fix 修复循环上限 N=3（按 gate check 失败结论计数，跨崩溃持久）+ Actions 分钟预算熔断（≥80% 告警/≥100% 置 org 变量撤全部 auto-merge，复位仅人工）。
+
+ADR-0041-post-merge-verification-and-auto-revert.md:
+  summary: post-merge 验证 + 自动 revert PR（合并后冒烟失败即生成 [auto-revert] PR 并 auto-merge；连续 revert 深度=1、每仓每小时 1 次双闸）——"事后回滚"实质替代"事前人审"的安全绳。
+
+ADR-0042-merge-queue.md:
+  summary: merge queue 接入：org API 不支持 merge_queue 规则→repo 级 ruleset（agent-registry/template-service 串行保守起步）；required 链路 workflow 须订阅 merge_group（EXPECTED_SKIP 登记义务）。
+
+ADR-0043-flaky-test-governance.md:
+  summary: flaky 治理：失败自动重试≤2 且每次入账；仅"失败→通过"转移计 flaky 事件（确定性失败重试后仍红不产生记录）；隔离清单带过期自动回炉，清单变更走 ADR。
+
+ADR-0044-gh-app-token-hardening.md:
+  summary: gh-app-token.sh 加固：JWT 签名改临时文件（Windows /proc fd 不可读）、JSON 工具 jq→python/node 降级链、安装令牌 600 权限 1h 缓存；ghcb 便捷入口。
+
+ADR-0045-app-no-workflows-permission.md:
+  summary: cloudbrid-agent App 永不持有 workflows/administration 权限（must_not_have 机器执法）；CI 工作流变更走 owner 凭据通道（diff 产出→owner 审后 apply，仍必须过 PR+gate）。
+
+ADR-0046-org-required-workflows-gate.md:
+  summary: gate 定义上移 org required workflows：org-gate.yml 落中心仓钉完整 SHA（PR 掏空本地 gate 的自审路径关闭）；中心/本地双轨并存观察（≥10 PR 100% 一致后退役本地轨）。
+
+ADR-0047-intent-entry-and-state-labels.md:
+  summary: 意图入口 issue form（九字段≡IR schema v1，全必填）+ 治理标签全集（10 state:*+2 type:*）进 expected-state；apply §7 幂等同步/drift §16 对账；设置权归 conductor（本 ADR 只管存在性与形状）。
+
+ADR-0048-phase1-direct-provider-api.md:
+  summary: 第一期模型接入直连 provider API（gateway 运维成本大于收益的 owner 裁定）：key 只存 org secret LLM_API_KEY，一切调用经计量 wrapper（无计量不算成功），alias 以 pipeline/models.yaml 角色档实现；附回切触发条件清单。
+
+ADR-0049-conductor-skeleton-and-event-gate.md:
+  summary: conductor 状态机骨架：transitions.yaml 外置唯一定义+受限 guard 求值器（白名单变量），非授权打标/命令静默丢弃+审计行，状态标签写一律 App 令牌；W0 只开一条主通路+认领/重试。
+
+ADR-0050-spec-author-reusable-workflow.md:
+  summary: spec-author 可复用 workflow：冷上下文（全程仅 IR 标题正文+spec 模板两个输入）、IR 正文定界符包裹注入防线+spec-check 结构/注入双扫（不过校验无 PR 产出）、角色档解析+计量回写。
+
+ADR-0051-agent-work-finding-protocol.md:
+  summary: 找活协议：AGENTS.md 标准块三命令（ghcb next 列 ready 卡/ghcb claim 认领/make gates-pr 本地复现关卡）；ghcb 是薄封装，认领合法性单一真源在 conductor guard。
+
+ADR-0053-archive-repo-and-adr-migration.md:
+  summary: archive 记忆层仓建立 + 旧 ADR 全量归档迁移：正本字节保真迁 archive/adr/（sha256 证明），decisions/ 留同名墓碑（org-gate/gate 按文件名校验零级联），状态唯一真源 = decisions/INDEX.yaml 墓碑索引，gate/§10 双世界兼容。
+
+ADR-0054-arbiter-kernel-v1.md:
+  summary: arbiter 仲裁内核 v1：独立最小仓（拆家原则——被审计者不得组装审计报告），纯 CAS 租约（git refs createRef 原子性）、无 LLM、默认拒绝、误放行台账；/claim 认领的原子层。
+
+ADR-0056-holdout-repo-and-canary.md:
+  summary: holdout 试卷层实体化：公开仓 + App 不安装的差异隔离（违规读取可检测而非靠保密），条目 schema 与校验器、封存/引用约定、泄漏诱饵注册+周期扫描+演习正控。
+
+ADR-0057-butler-skeleton-wake-matrix.md:
+  summary: 管家骨架：唤醒矩阵前三行落地（6h reconcile/15min 账本刷新/1h 预算检查）+ dead-man 心跳 ping/trip 双侧（缺席即停自动合并）+ 统一审计形态 butler-audit.sh 与策略真源 butler.yaml。

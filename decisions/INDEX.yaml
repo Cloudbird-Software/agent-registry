@@ -1,0 +1,432 @@
+# 墓碑索引（W1-C1/ADR-0053）——ADR 编号→状态→archive 路径。
+# 机器可读真源：gate adr-required / drift-check §10 经本索引解析 archive 正本；
+# 三态 lifecycle 见宪法 §1（active/superseded/archived）；新 ADR 落 archive+此处登记。
+# #96（ADR 实质校验）扩展点：entry 可扩展 substantive: {h1, sections} 等字段。
+version: 1
+source_commit: bf8f4a7542b764940a62e30f7ed0e1d70447787f
+migrated_at: 2026-08-21T14:22:27Z
+comment: 墓碑索引（W1-C1/ADR-0053）——ADR 编号→状态→archive 路径；新 ADR 落 archive+此处登记
+entries:
+  - number: 1
+    title: "建立 agent-registry，四类声明统一落盘"
+    file: ADR-0001-agent-registry-establishment.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0001-agent-registry-establishment.md
+    content_sha256: 725f53ef09f395667d6d58b92bcf51600af3c4f4fd2fd799edd2f0e01708b72b
+  - number: 2
+    title: "模型接入 = LLM Gateway 常驻服务，alias 是唯一接口"
+    file: ADR-0002-llm-gateway.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0002-llm-gateway.md
+    content_sha256: f42e05ef455bf5644c9a2232ceb3cec1a3ac8bf34a76a5e401b3e4a73d435247
+  - number: 3
+    title: "过程数据三分离——声明与决策进 git，事件进数据库，轨迹进对象存储"
+    file: ADR-0003-process-data-tiering.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0003-process-data-tiering.md
+    content_sha256: 7991cd8d1085eb836bb2d282bd3fb21a87b51bde1d27f2d7cd04ddaa9c89144a
+  - number: 4
+    title: "团队分 ephemeral/persistent，销毁前强制资产移交（handoff）"
+    file: ADR-0004-team-lifecycle-handoff.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0004-team-lifecycle-handoff.md
+    content_sha256: 3291fff7787adb14ce029751dc7ea0856bc7326f2899eaca7bf3861530b94711
+  - number: 5
+    title: "软硬双层控制——AGENTS.md 管引导，权限引擎+凭据+CI 管强制"
+    file: ADR-0005-hard-vs-soft-control.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0005-hard-vs-soft-control.md
+    content_sha256: 273219a10761c4f455efc9fb150c359e57c48624b70245fd517fce602e124c6f
+  - number: 6
+    title: "治理仓变更分级流程与破玻璃回填制"
+    file: ADR-0006-governance-change-control.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0006-governance-change-control.md
+    content_sha256: e00c670be2e823e1dc7c2e39e095b40afed2f8f848bd725b7b05da2cc20820b4
+  - number: 7
+    title: "agent 原型分类（archetype）与三层验证链"
+    file: ADR-0007-archetype-verification-chain.md
+    lifecycle: superseded
+    decision_status: accepted
+    archive_path: adr/ADR-0007-archetype-verification-chain.md
+    content_sha256: ee8180a63c97823598d65dc8d79a7fef4590aec82389636e92a92747dc703ce7
+    superseded_by: ADR-0010
+    rationale: 七分类与 AR-9 三层验证链被 archetype v2（ADR-0008）→ Governance v3（ADR-0010）重构取代，0010"被推翻的先前决策"表显式列出 ADR-0007 的 checker 评审计划条款；no-self-test 原则经 0008/0010 传承。
+  - number: 8
+    title: "archetype v2——补 planner/judge/researcher，十原型封顶"
+    file: ADR-0008-archetype-v2-ten.md
+    lifecycle: superseded
+    decision_status: accepted
+    archive_path: adr/ADR-0008-archetype-v2-ten.md
+    content_sha256: 6536cdb5f7240b511cc11629abba121b7e90c6f8a2b7d9d20a9a59d53584d516
+    superseded_by: ADR-0010
+    rationale: 十原型 LLM 化被 ADR-0010 重构（checker→test-author+verifier、operator→deployer+responder 拆分，orchestrator/interface/observer 降为机制原型）；planner=设计时、researcher as_tool 等仍有效结论由 0010 承接。
+  - number: 9
+    title: "archetype 内部构成与职责保证——profiles 机制"
+    file: ADR-0009-archetype-profiles.md
+    lifecycle: superseded
+    decision_status: accepted
+    archive_path: adr/ADR-0009-archetype-profiles.md
+    content_sha256: ece1a8ba0b471209d5141f66543df988e26974670fa882303f75ecfef597a232
+    superseded_by: ADR-0010
+    rationale: profiles v1 机制（forbidden_* 黑名单/permissions_mode 双义/structural 字符串形式）被 ADR-0010 v2 全部取代（推翻表："全部由 v2 取代"）；profile 六要素框架本身经 v2 延续。
+  - number: 10
+    title: "Governance v3 —— 威胁模型重排与角色体系重构"
+    file: ADR-0010-governance-v3.md
+    lifecycle: active
+    decision_status: proposed
+    archive_path: adr/ADR-0010-governance-v3.md
+    content_sha256: 66b589485d769d1c45c72f1a8e0de2727cd3191570cb04ff3cd2b81201c2d880
+  - number: 11
+    title: "Runner 运行时出网监控（audit 起步）与安全姿态基线"
+    file: ADR-0011-runtime-egress-monitoring-and-scorecard.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0011-runtime-egress-monitoring-and-scorecard.md
+    content_sha256: 3079bb460a68d9adcbc4163d06c3ce2aee61811760270fba1609912f4c9e3b80
+  - number: 11
+    title: "团队协作标准 v1.0——可执行声明与流程彩排门禁"
+    file: ADR-0011-team-collaboration-v1.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0011-team-collaboration-v1.md
+    content_sha256: 6f9a385966da67cac87e9360dd607a7a3fdc408d06216c99092aa272691f615e
+  - number: 12
+    title: "team.schema v2 对齐实例语义 + check:* 防线注册表"
+    file: ADR-0012-team-schema-v2-and-checks-registry.md
+    lifecycle: active
+    decision_status: proposed
+    archive_path: adr/ADR-0012-team-schema-v2-and-checks-registry.md
+    content_sha256: 4432f7162d9884d56fdf48b833c13804cecb53b2ff297a7d2200b2b992c22e43
+  - number: 13
+    title: "红队演练修复批次——验证器元验证、防线注册表硬化与 ADR 编号唯一性"
+    file: ADR-0013-redteam-remediation.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0013-redteam-remediation.md
+    content_sha256: a60064553f81e8cac0ec0c7e71d86317121a1c4d0ed901e6743fe49e11071195
+  - number: 14
+    title: "组织级流程显式化——意图路由、验收三分法与维护回路"
+    file: ADR-0014-intent-routing.md
+    lifecycle: active
+    decision_status: proposed
+    archive_path: adr/ADR-0014-intent-routing.md
+    content_sha256: f97f7fd588ea967793edf099fffda5f63e0380cb47885f725e5c14fa74dda48d
+  - number: 15
+    title: "场景引擎与测试底层方法统一"
+    file: ADR-0015-scenario-engine.md
+    lifecycle: active
+    decision_status: proposed
+    archive_path: adr/ADR-0015-scenario-engine.md
+    content_sha256: 18f8c5bf1022e0246a427f6b0fa96f42b452cfce72c3083ce9e8738b3f4007b4
+  - number: 16
+    title: "红队演练二批修复——三治仓声执一致性与漂移检测盲区"
+    file: ADR-0016-redteam-remediation-batch2.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0016-redteam-remediation-batch2.md
+    content_sha256: a8cd23ce46f51bafefa882196686a2200248d6fc68ed0852579884527e3fd150
+  - number: 17
+    title: ".github 破玻璃直推回填——Trae 工具产物与误入 gitlink"
+    file: ADR-0017-github-bootstrap-direct-push-backfill.md
+    lifecycle: archived
+    decision_status: accepted
+    archive_path: adr/ADR-0017-github-bootstrap-direct-push-backfill.md
+    content_sha256: c21dc287715f00dcdd8f087ec4e1715776614126976459447c490cbda7d5001d
+    rationale: .github 两次 admin 直推（Trae IDE 分享 zip + 误入 agent-registry gitlink）的一次性破玻璃回填，事件已闭环且 7 天报警窗已过；expected-state 豁免条目仍以本 ADR 为登记背书（历史事实，非持续义务）。
+  - number: 18
+    title: "上下文装配清单、记忆契约与开源项目清单"
+    file: ADR-0018-context-assembly-memory-and-supply-chain.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0018-context-assembly-memory-and-supply-chain.md
+    content_sha256: 44ab2af9d9434f3d935412eee7c457bb7064a451e538acc61c3dde9ceb95ab13
+  - number: 19
+    title: "agent-registry 仓库可见性修正为 public"
+    file: ADR-0019-repo-visibility-public.md
+    lifecycle: superseded
+    decision_status: accepted
+    archive_path: adr/ADR-0019-repo-visibility-public.md
+    content_sha256: f513820dfe07b20e7ddcf284633b367bcc42ba8479f8f9170ec482635f3f0d0e
+    superseded_by: ADR-0020
+    rationale: agent-registry 单仓公开修正被 ADR-0020 组织全仓公开政策整体吸收，且其"私有仓可在 REPOS.yaml 标 exempt"条款被 0020 显式废除（exempt 只豁免治理基线不豁免可见性）。
+  - number: 20
+    title: "组织全仓公开政策与可见性小时级漂移检测"
+    file: ADR-0020-org-wide-public-visibility-and-hourly-drift.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0020-org-wide-public-visibility-and-hourly-drift.md
+    content_sha256: da54b2475c38fdf7e350f02ea24e78e3237876fd2ddab770f4611ac4cbd16675
+  - number: 21
+    title: "红队批次3修复与治理测试回路"
+    file: ADR-0021-redteam-batch3-and-governance-test-loop.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0021-redteam-batch3-and-governance-test-loop.md
+    content_sha256: 192d638d4c60ab6f2f21aa343fb7ce304f71135740fc5e6f0f3848553f2ece64
+  - number: 22
+    title: "注册层门禁硬化（issue #31 审计收敛）"
+    file: ADR-0022-registry-gate-hardening.md
+    lifecycle: active
+    decision_status: proposed
+    archive_path: adr/ADR-0022-registry-gate-hardening.md
+    content_sha256: 0d3776f4f08e96434af3558f8b2141055e32ac7539c2708e8d904dd32a63c3a4
+  - number: 23
+    title: "AI_Web_School 纳入组织治理基线"
+    file: ADR-0023-ai-web-school-governance-onboarding.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0023-ai-web-school-governance-onboarding.md
+    content_sha256: 1d97dec8aa087a966ab0b39b27adc5f38b58636ce7750b77c1c735bd7a4a3e90
+  - number: 24
+    title: "Use-up-Plan 建仓申报与 bootstrap 直推豁免登记"
+    file: ADR-0024-use-up-plan-bootstrap-onboarding.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0024-use-up-plan-bootstrap-onboarding.md
+    content_sha256: 74643304a3e5b61cb2e2069f724f53faac3eb8c43d2b2450c31dd2edb6abd9c4
+  - number: 25
+    title: "agent-platform 立项——声明渲染到 openjiuwen 运行时的执行层"
+    file: ADR-0025-agent-platform-bootstrap.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0025-agent-platform-bootstrap.md
+    content_sha256: 26e2d483070ad3b3d3ab5b58c2a43f3f0d79d63745ca1d397d0bb1c43061f9eb
+  - number: 26
+    title: "dep-review 增加 allow-dependencies-licenses 可选透传输入（许可证归一化误报精确豁免）"
+    file: ADR-0026-dep-review-license-exemption-passthrough.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0026-dep-review-license-exemption-passthrough.md
+    content_sha256: a2cd160042e847b40cc2dc335ee8b5425b725275356cf0db2babe751d9da604a
+  - number: 27
+    title: "mutual 立项——LLM 双向互惠推荐引擎的 Go+BAML 重写"
+    file: ADR-0027-mutual-gobaml-rewrite-onboarding.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0027-mutual-gobaml-rewrite-onboarding.md
+    content_sha256: 21528ebec9729521044fd036a89e7374255595f7bf8c26fb6218d2425041262d
+  - number: 28
+    title: "Use-up-Plan 应用层语言基线 Go（CI runtime 切换）"
+    file: ADR-0028-use-up-plan-go-language-baseline.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0028-use-up-plan-go-language-baseline.md
+    content_sha256: 3e9091e221f89867202b377751dd944ca85493917589dc95641069e93196aa25
+  - number: 29
+    title: "仓库级 auto-merge 纳入期望状态对账（自动合并计划 P1-1）"
+    file: ADR-0029-allow-auto-merge-reconciliation.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0029-allow-auto-merge-reconciliation.md
+    content_sha256: 2c1e79a62dd4574ead1aa92c337ed6f8c9e0f4e29e84f19da8013d0620ee3e85
+  - number: 30
+    title: "agent-registry gitlink 误入事件的破玻璃回填（60bd155 + e9424d2）"
+    file: ADR-0030-agent-registry-gitlink-breakglass-backfill.md
+    lifecycle: archived
+    decision_status: accepted
+    archive_path: adr/ADR-0030-agent-registry-gitlink-breakglass-backfill.md
+    content_sha256: ce89ae3142b8bc1d4b566e2915ab5d0879e20561a53502c92ab98a1ea295ec60
+    rationale: agent-registry gitlink 误入事件的破玻璃回填，处置完毕无持续义务；确立的"破玻璃直推解锁 CI 死锁+ADR 回填"范式已沉淀为流程知识；豁免条目以本 ADR 为登记背书（历史事实）。
+  - number: 31
+    title: "拆除 required_review_thread_resolution 死锁 + 机器反馈通道规范（P1-2）"
+    file: ADR-0031-remove-thread-resolution-deadlock.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0031-remove-thread-resolution-deadlock.md
+    content_sha256: dc2c9af55ac77fe3730a62ab1d44fb09e7befafd393655376a46294cb5dcd45b
+  - number: 32
+    title: "gate aggregator 严格化——skipped ≠ success + workflow 级路径过滤禁令（P1-3）"
+    file: ADR-0032-gate-aggregator-strict-skipped-not-success.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0032-gate-aggregator-strict-skipped-not-success.md
+    content_sha256: 5ef02f95a7c147974f626cabee06360266c78e2590a1a43b8f133e7c3e5ac117
+  - number: 33
+    title: "governance-drift 检测步骤 pipefail 修复（GM-1 漂移报警机制失效）"
+    file: ADR-0033-governance-drift-pipefail.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0033-governance-drift-pipefail.md
+    content_sha256: f0760884b05756a5c924b88b3573f6f6c774c2c6584cd323e465f4af2eb366ce
+  - number: 34
+    title: "required check 活体验证 + PR liveness 侦测（P1-4）"
+    file: ADR-0034-required-check-liveness-and-pr-stuck-detection.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0034-required-check-liveness-and-pr-stuck-detection.md
+    content_sha256: cfd4d014f4b7215a0c1a74d2c8cd240b311a4794464e560f1ecd84755a6d3e5b
+  - number: 35
+    title: "测试篡改检测门 test-integrity（P2-1）"
+    file: ADR-0035-test-integrity-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0035-test-integrity-gate.md
+    content_sha256: 0217546eaf959f9809c7210c0fffde56c42c544f7d8b34afaab1ab568eb87d6a
+  - number: 36
+    title: "抑制标记预算门——豁免配额化与总量棘轮（P2-2）"
+    file: ADR-0036-suppression-marker-budget-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0036-suppression-marker-budget-gate.md
+    content_sha256: a1afab578846c1b31a6b38dc67ec05e42e8214113a4bedc5a4304b725b8345bc
+  - number: 37
+    title: "diff coverage 门槛——PR 变更行覆盖率门禁（P2-3）"
+    file: ADR-0037-diff-coverage-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0037-diff-coverage-gate.md
+    content_sha256: 4810408649713bb6a5ca6f06ad1f42e847108a57af59c99210489698b428da90
+  - number: 38
+    title: "契约兼容性检测门——OpenAPI breaking + JSON Schema breaking + DB migration 前后兼容（P2-4）"
+    file: ADR-0038-contract-compatibility-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0038-contract-compatibility-gate.md
+    content_sha256: 8de5250862e2033371fa7be0357495a5a35da1cb540ccd1c2339ba073b5a166c
+  - number: 39
+    title: "依赖供应链 policy 落地——dep-review 从'跑了'升级为有具体 policy（P2-5）"
+    file: ADR-0039-dependency-supply-chain-policy.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0039-dependency-supply-chain-policy.md
+    content_sha256: beadc7c1509be5cf199329db82806bf5c900b232499cd25f0f75f03cb1c61f17
+  - number: 40
+    title: "auto-fix 修复循环上限 + 额度/成本熔断（P2-8）"
+    file: ADR-0040-auto-fix-limit-and-cost-circuit-breaker.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0040-auto-fix-limit-and-cost-circuit-breaker.md
+    content_sha256: abd8e24bf6d711c9540e0e2b8bb69f68c00f54cd57546a0ad2da75e6bdef6a2d
+  - number: 41
+    title: "post-merge 验证 + 自动 revert（P2-6，自动合并的核心安全绳）"
+    file: ADR-0041-post-merge-verification-and-auto-revert.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0041-post-merge-verification-and-auto-revert.md
+    content_sha256: 6cf6f47691f2fbe129a98ea7b900ced891e805b7783a6338d2c320c768e0476f
+  - number: 42
+    title: "merge queue 接入（P2-7）"
+    file: ADR-0042-merge-queue.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0042-merge-queue.md
+    content_sha256: b3c1088fbb496c4b0422bdb580634fa6d53becac292fccc63d38e8949d02f0c5
+  - number: 43
+    title: "flaky 测试治理——重试入账、识别、带过期隔离（P2-9）"
+    file: ADR-0043-flaky-test-governance.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0043-flaky-test-governance.md
+    content_sha256: 770a4dc3bbdab446e374d1aa88ecdd70259e22c9a1d5102372e276ac7ea187c8
+  - number: 44
+    title: "gh-app-token.sh 加固——Windows 兼容、jq 降级可选、安装令牌缓存"
+    file: ADR-0044-gh-app-token-hardening.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0044-gh-app-token-hardening.md
+    content_sha256: aa861b7ef6ed071759a98b520994edd5f09e929a4c1baea6fe9736996bbc66be
+  - number: 45
+    title: "cloudbrid-agent App 永不持有 workflows 权限——CI 工作流变更走 owner 凭据通道"
+    file: ADR-0045-app-no-workflows-permission.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0045-app-no-workflows-permission.md
+    content_sha256: 10044d656ffeb3bdeeaf4198f7407dac3efb0ecafb90d8f59c14a9c16555fbb2
+  - number: 46
+    title: "gate 定义上移至 org required workflows（P3-1 枢轴）"
+    file: ADR-0046-org-required-workflows-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0046-org-required-workflows-gate.md
+    content_sha256: 4a4c16df4c66d3f42dc01cf02e8c2b6df93eec25ddfa991f4a71593391db9bb0
+  - number: 47
+    title: "意图入口 issue form 与治理标签全集（IR-0001 W0-C2）"
+    file: ADR-0047-intent-entry-and-state-labels.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0047-intent-entry-and-state-labels.md
+    content_sha256: 03a821938568d92d0fa1dc0d080b4e36baeb63656905c66daba8b76961d245a9
+  - number: 48
+    title: "第一期模型接入直连 provider API（AR-3 的第一期形态）"
+    file: ADR-0048-phase1-direct-provider-api.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0048-phase1-direct-provider-api.md
+    content_sha256: 705923553cb8ce5e3fff34d34dff48c42398a02cbd317c9956db77a19ce431e3
+  - number: 49
+    title: "conductor 状态机骨架与事件入口安全（IR-0001 W0-C3）"
+    file: ADR-0049-conductor-skeleton-and-event-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0049-conductor-skeleton-and-event-gate.md
+    content_sha256: bdd8197ff6dc5b458e7d2da15c52b5b3de502d7a36a33dbd1a9d381039a39e7f
+  - number: 50
+    title: "spec-author 可复用 workflow（冷上下文 + 注入防线 + 计量）"
+    file: ADR-0050-spec-author-reusable-workflow.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0050-spec-author-reusable-workflow.md
+    content_sha256: de0414a996f45f7b8e19f18fadef50f62424ac88f3d67efff1f2e655cf798ce9
+  - number: 51
+    title: "找活协议——AGENTS.md 标准块与 ghcb next/claim"
+    file: ADR-0051-agent-work-finding-protocol.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0051-agent-work-finding-protocol.md
+    content_sha256: 7639649800208ae5196aa537ea9999fa489a882ad6b05d024387af27085361b4
+  - number: 53
+    title: "archive 记忆层仓与旧 ADR 归档迁移（W1-C1）"
+    file: ADR-0053-archive-repo-and-adr-migration.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0053-archive-repo-and-adr-migration.md
+    content_sha256: bdfaf68abddf29c893729a6558058cb581dd9bce329d592d9b424410201a2df2
+  - number: 54
+    title: "arbiter 仲裁内核 v1——独立仓、纯 CAS 租约、无 LLM、默认拒绝"
+    file: ADR-0054-arbiter-kernel-v1.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0054-arbiter-kernel-v1.md
+    content_sha256: 36d4d3acf67ad900f6aee163d4bf8dc62feaf21d62001fe3d4c6ff100a798f94
+  - number: 55
+    title: "统一入口协议块 + factory-floor 只读投影板 + dashboard 账本"
+    file: ADR-0055-entry-protocol-board-dashboard.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0055-entry-protocol-board-dashboard.md
+    content_sha256: 92fa5af9311e81a4bfc109492c3c6db1c4d623fc111ba75bb8c42cfd6cf71593
+  - number: 56
+    title: "holdout 仓与泄漏诱饵（试卷层实体化）"
+    file: ADR-0056-holdout-repo-and-canary.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0056-holdout-repo-and-canary.md
+    content_sha256: a57c39e85b57a9831da2c63629a1530204a6f000a01a9976702adf71cce36589
+  - number: 57
+    title: "管家骨架——唤醒矩阵前三行 + 审计日志 + dead-man 心跳 fail-closed"
+    file: ADR-0057-butler-skeleton-wake-matrix.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0057-butler-skeleton-wake-matrix.md
+    content_sha256: c33c661045e75dc4720967683a1076e0bc5a6791c0f3c9a78ba9066ab1b978d1
+  - number: 58
+    title: "Shorts_Director 直推 f63baf26 追认回填（GM-2 §8 豁免登记）"
+    file: ADR-0058-shorts-director-direct-push-backfill.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0058-shorts-director-direct-push-backfill.md
+    content_sha256: 50ca6e84c2cf8d77232efa6a79a8f3dafa9a4034fa475b6efabe982a84509beb
+  - number: 59
+    title: "自动合并 SLI 周报与每周抽样审计"
+    file: ADR-0059-sli-weekly-report.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0059-sli-weekly-report.md
+    content_sha256: 16cf68b91673bf9a1a3c19523706a6e3c6f62d28af0ef4e560fc2e8d8107a2cc
