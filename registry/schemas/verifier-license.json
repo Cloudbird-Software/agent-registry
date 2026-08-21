@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cloudbird/agent-registry/schemas/verifier-license",
+  "title": "verifier-license",
+  "description": "T2 verifier 执照声明（宪法 §4C 持证上岗 / ADR-0072 决策 2/6）。条目=执照：入职考试全过才有条目；注册校验=scripts/verifier-license.py 对照 CI-Workflows 成绩存档（judge_id@exam_version@prompt_hash12 键；replay 回放成绩不可注册）。标注负债申报为必填——未配预算不许从 T3 迁移（§10.4 负债永久）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "license_id",
+    "judge_id",
+    "model_alias",
+    "issued_at",
+    "exam",
+    "annotation_budget",
+    "enforcement"
+  ],
+  "properties": {
+    "license_id": {
+      "type": "string",
+      "description": "执照标识，必须与成绩存档键一致：judge_id@exam_version@prompt_hash12"
+    },
+    "judge_id": {
+      "type": "string",
+      "description": "判官标识（成绩存档键的 id 侧；换模型=新 judge_id=重考）"
+    },
+    "model_alias": {
+      "type": "string",
+      "description": "provider 模型别名（模型无关条款 §13 推论三：自训练小模型同受考试）"
+    },
+    "issued_at": {
+      "type": "string",
+      "description": "发证时间（ISO 8601）"
+    },
+    "exam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archive_key",
+        "exam_version",
+        "prompt_hash",
+        "frozen_exam_sha256",
+        "overall_pass",
+        "results_ref",
+        "judge_mode"
+      ],
+      "properties": {
+        "archive_key": {
+          "type": "string",
+          "description": "成绩存档键（=license_id；verifier-license.py 核验成绩存档存在且 pass）"
+        },
+        "exam_version": {
+          "type": "string",
+          "description": "考试集版本（archive evalsets/verifier-exam/vN）"
+        },
+        "prompt_hash": {
+          "type": "string",
+          "description": "判题 prompt 哈希（prompt 改动即重考——档案可追溯）"
+        },
+        "frozen_exam_sha256": {
+          "type": "string",
+          "description": "考试集冻结哈希（成绩存档声明真源=archive manifest freeze_hash）"
+        },
+        "overall_pass": {
+          "type": "boolean",
+          "const": true,
+          "description": "必须为 true——任一分项不过即无执照（拒上岗）"
+        },
+        "results_ref": {
+          "type": "string",
+          "description": "成绩存档引用（CI-Workflows verifier-exam workflow artifact run 引用，如 run 12345 的 verifier-exam-results）"
+        },
+        "judge_mode": {
+          "type": "string",
+          "enum": ["api"],
+          "description": "只认真实判官成绩；replay 回放成绩不可注册（verifier-license.py 拒绝）"
+        },
+        "sections": {
+          "type": "object",
+          "description": "分项成绩快照（accuracy/negative_rate/agreement 各分项 + 阈值）"
+        }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "description": "锁定采样参数（temperature/top_p/max_tokens/thinking/seed——与成绩记录一致）"
+    },
+    "annotation_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annual_hours", "status", "covers"],
+      "properties": {
+        "annual_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "年度标注人力预算（小时）——未配预算不许上岗"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["committed"],
+          "description": "申报即承诺（负债永久：模型换代即重标，§10.4）"
+        },
+        "covers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "预算覆盖的维度/校准集（如五维 rubric、owner 裁决回流）"
+        }
+      }
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimensions", "annotation_debt"],
+      "properties": {
+        "id": {"type": "string", "description": "rubric 契约标识（如 ai-readability/v1.0.0）"},
+        "dimensions": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "判据分解维度清单（须与 rubric 契约一致）"
+        },
+        "annotation_debt": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["dimension", "status", "reason"],
+            "properties": {
+              "dimension": {"type": "string"},
+              "status": {"type": "string", "enum": ["insufficient-data"]},
+              "reason": {"type": "string"}
+            }
+          },
+          "description": "标注负债申报（哪些维度当前数据不足=负债，显式记录；空数组=无负债）"
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["veto", "since"],
+      "properties": {
+        "veto": {
+          "type": "boolean",
+          "description": "false=仅 shadow（ADR-0072 决策 5）；true 须另附信任门晋升依据（宪法 §5）"
+        },
+        "since": {
+          "type": "string",
+          "description": "该执法档生效时间"
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sensitivity_floor", "specificity_floor", "owner_confirmation_rate_min"],
+      "properties": {
+        "sensitivity_floor": {"type": "number", "description": "敏感度下限（CI 下界低于及格线=自动升人类）"},
+        "specificity_floor": {"type": "number", "description": "特异度下限"},
+        "owner_confirmation_rate_min": {
+          "type": "number",
+          "enum": [0.2],
+          "description": "owner 确认率 ≥20%（首版从 0 起累积的指标位）"
+        }
+      }
+    }
+  }
+}
