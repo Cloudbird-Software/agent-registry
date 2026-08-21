@@ -430,3 +430,101 @@ entries:
     decision_status: accepted
     archive_path: adr/ADR-0059-sli-weekly-report.md
     content_sha256: 16cf68b91673bf9a1a3c19523706a6e3c6f62d28af0ef4e560fc2e8d8107a2cc
+  - number: 60
+    title: "quality/ 骨架——contract.yaml 唯一阈值源 + spec lint（EARS/禁词/追溯闭合）+ g010"
+    file: ADR-0060-quality-skeleton-contract-spec-lint.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0060-quality-skeleton-contract-spec-lint.md
+    content_sha256: b93d1169fc640071831aecd77511d44f8e56257f403b9dfbe14f1d91a9316f3a
+  - number: 61
+    title: "测试产物拓扑——fail-before + lock-tests + g060 + Makefile 三命令"
+    file: ADR-0061-test-artifact-topology-fail-before-lock.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0061-test-artifact-topology-fail-before-lock.md
+    content_sha256: 3cc11518964af5947d5b5415b5417f642a713c0683ba19d7a8f1bd0ff9a785e4
+  - number: 62
+    title: "计量 wrapper 完整版——invoke 聚合 + 产物 hash 链 + LLM 预算通道"
+    file: ADR-0062-metering-wrapper-invoke-hash-chain.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0062-metering-wrapper-invoke-hash-chain.md
+    content_sha256: 5e0883afc2728469ee03db11af0e0141bd67972872127bac30026b471cab639c
+  - number: 63
+    title: "OCR shadow 接入——钉版 + 确定性后处理 + post-fix precision 管线"
+    file: ADR-0063-ocr-shadow-onboarding.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0063-ocr-shadow-onboarding.md
+    content_sha256: edf3ff50ae60ea920b1b32af74b20a10c8eb7f6d5b477ed328709add1c510ddc
+  - number: 64
+    title: "Bug 流水线——env-gate + 哨兵自证 + 三值判定 + cannot-reproduce"
+    file: ADR-0064-bug-pipeline-env-gate-tri-verdict.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0064-bug-pipeline-env-gate-tri-verdict.md
+    content_sha256: 1002ea64ea415735437a98af4e1c411c9b45bde95b145b82eadfb5918d098d37
+  - number: 65
+    title: "patrol 巡逻服务——三源场景 + 指纹去重频控 + 毕业机制"
+    file: ADR-0065-patrol-service-three-sources.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0065-patrol-service-three-sources.md
+    content_sha256: 7b0bb9f5442b337c6d71eef59a432e57174608c595da85e9dbe481aa06b5b90e
+  - number: 66
+    title: "语义熵分歧度量——k=5 跨族 + 聚簇 + 底噪扣减 + 交叉质询"
+    file: ADR-0066-semantic-entropy-divergence.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0066-semantic-entropy-divergence.md
+    content_sha256: 932fa691b8ae44489f1ac9309214daf1f1bbf4cad81830b7d83857f039439f64
+  - number: 67
+    title: "恶意合规 adversary——judge-deep 锁定 + 套件不充分判定"
+    file: ADR-0067-malicious-compliance-adversary.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0067-malicious-compliance-adversary.md
+    content_sha256: 57d8d61584b49ab3bc1fa3c3883b218ef3aa3e05fe5c4a4737f764e79dc9e5fe
+  - number: 68
+    title: "holdout 揭封 gate——hash 校验 + 计数化展示 + 详情回写 + 日志审计"
+    file: ADR-0068-holdout-unseal-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0068-holdout-unseal-gate.md
+    content_sha256: 0d257255225b05942bc1c0730ea32a22afb31577e500d32340df3c91f5c173e6
+  - number: 69
+    title: "活体演习链路——周种子缺陷注入 + 诱饵联动 + 缺席 fail-closed 演练"
+    file: ADR-0069-live-drill-seed-defects.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0069-live-drill-seed-defects.md
+    content_sha256: 4af9e2a0636303eea881a4a4f2b181dc37487132b89d6bf0a0fbe9af951ef988
+  - number: 70
+    title: "整洁关卡组全量——结构 + AI 导航 + 抗复杂度 + 棘轮"
+    file: ADR-0070-tidiness-gates-full-set.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0070-tidiness-gates-full-set.md
+    content_sha256: 46fbce87a4cd26ccc61b999f1dd966deb515862889d590c80928357a6ce1a7b2
+  - number: 71
+    title: "硬谓词信任门 + shadow 域解锁（替代 risk-score）"
+    file: ADR-0071-hard-predicate-trust-gate.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0071-hard-predicate-trust-gate.md
+    content_sha256: fda7d6648ac89c64222368cf4e78af975750312664513a2941f4b9600e1785a9
+  - number: 72
+    title: "verifier 入职考试 CI + 校准集循环 + AI 可读性 rubric shadow"
+    file: ADR-0072-verifier-entrance-exam-calibration.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0072-verifier-entrance-exam-calibration.md
+    content_sha256: 14e7d5766b2c3cfa6741772e5b30b5be7ddef2fa2d06b1018972e129f856c7e9
+  - number: 73
+    title: "度量 dashboard 完整版——北极星对同屏 + 四类指标 + 板字段"
+    file: ADR-0073-metrics-dashboard-full.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0073-metrics-dashboard-full.md
+    content_sha256: e6edb8d4cd7b383d8e68bc55e79a8f5bc70ab5909fa91bb9bcf8c3e86b7447a6
