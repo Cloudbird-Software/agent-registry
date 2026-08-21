@@ -528,3 +528,10 @@ entries:
     decision_status: accepted
     archive_path: adr/ADR-0073-metrics-dashboard-full.md
     content_sha256: e6edb8d4cd7b383d8e68bc55e79a8f5bc70ab5909fa91bb9bcf8c3e86b7447a6
+  - number: 74
+    title: "ADR-0057 运行反馈修订——reconcile 孤儿标签语义收窄 + dead-man 双层触发"
+    file: ADR-0074-amend-0057-reconcile-orphan-and-deadman-backstop.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0074-amend-0057-reconcile-orphan-and-deadman-backstop.md
+    content_sha256: 07b9806818a1d67669be6f74f47f97a98d1e9aa0f0dca5cae307db2f4c0ed584
