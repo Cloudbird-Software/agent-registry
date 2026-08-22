@@ -535,3 +535,10 @@ entries:
     decision_status: accepted
     archive_path: adr/ADR-0074-amend-0057-reconcile-orphan-and-deadman-backstop.md
     content_sha256: 07b9806818a1d67669be6f74f47f97a98d1e9aa0f0dca5cae307db2f4c0ed584
+  - number: 75
+    title: "canary C4/C5 预期勘误——承认双轨 main-protection + SHA/双形态供应链引用"
+    file: ADR-0075-amend-canary-c4-c5-dual-track-and-sha-pin.md
+    lifecycle: active
+    decision_status: accepted
+    archive_path: adr/ADR-0075-amend-canary-c4-c5-dual-track-and-sha-pin.md
+    content_sha256: 98c9b709f77633eae94fea87438e0f436903726746166aa4e1f2e18e4c20a1e9

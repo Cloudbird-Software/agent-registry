@@ -121,9 +121,18 @@ def check_c3() -> None:
 # ── C4 供应链入口 ────────────────────────────────────────────
 def check_c4() -> None:
     tmpl_ci = raw("template-service", ".github/workflows/ci.yml")
+    # 双合法形态（与 C6 钉扎政策一致）：
+    #   (a) @vN 大版本指针（版本策略既有形态）；
+    #   (b) 40-hex SHA + ciw-ref 透传（zizmor blanket 钉扎政策要求 SHA——比 @vN
+    #       更强：不可变+可审计；ciw-ref 双端一致防 reusable 上下文 ref 漂移，ADR-0043）。
+    # 选型倾向 SHA-only（issue #259 owner 裁决），但 @vN 仍合法——不断言形态统一。
+    ciw_ref_re = re.compile(
+        r"Cloudbird-Software/CI-Workflows/\.github/workflows/(hygiene|check|dep-review)\.yml"
+        r"@(v[0-9]+|[0-9a-f]{40})"
+    )
     for w in ("hygiene.yml", "check.yml", "dep-review.yml"):
-        if f"Cloudbird-Software/CI-Workflows/.github/workflows/{w}@v" not in tmpl_ci:
-            fail(f"C4: template-service ci.yml 未引用 CI-Workflows/{w}@vN（CI-1 聚合防线缺口）")
+        if not ciw_ref_re.search(tmpl_ci):
+            fail(f"C4: template-service ci.yml 未引用 CI-Workflows/{w}（@vN 或 40-hex SHA 均可；CI-1 聚合防线缺口）")
     checks = {
         ".github": raw(".github", ".github/workflows/gate.yml"),
         "CI-Workflows": raw("CI-Workflows", ".github/workflows/ci.yml"),
@@ -151,8 +160,10 @@ def check_c5() -> None:
             fail("C5: main-protection required_approving_review_count != 0（一人公司自批无效——声明的 0 才与现实一致）")
     rsc = [r for r in mp.get("rules", []) if r.get("type") == "required_status_checks"]
     ctxs = [c.get("context") for r in rsc for c in r.get("parameters", {}).get("required_status_checks", [])]
-    if ctxs != ["gate"]:
-        fail(f"C5: main-protection required checks={ctxs} != ['gate']（BP-2）")
+    # BP-2 观察期双轨：本地轨 'gate' + 组织轨 'org-gate' 并行（退役本地轨需未来新 ADR；
+    # canary 承认双轨合法——不断言单轨，但要求两轨齐全）。
+    if set(ctxs) != {"gate", "org-gate"}:
+        fail(f"C5: main-protection required checks={ctxs} 非双轨 ['gate','org-gate']（BP-2 观察期；退役本地轨需未来新 ADR）")
     cg = json.loads(raw(".github", "governance/rulesets/codeql-gate.json"))
     excl = (((cg.get("conditions") or {}).get("repository_name") or {}).get("exclude")) or []
     if ".github" not in excl:
@@ -199,7 +210,10 @@ def check_c6() -> None:
                              ".github/workflows/scorecard.yml"],
         "agent-registry": [".github/workflows/validate.yml"],
     }
-    uses_re = re.compile(r"uses:\s*(\S+)")
+    # 仅匹配 YAML 键（行首可选空白 + 可选 "- " 列表标记 + "uses:"），排除注释/字符串。
+    # 此前正则 uses:\s*(\S+) 会误匹配注释里的 "uses: pin 同值（40 位" 与脚本字符串，
+    # 导致 C6 对全钉扎文件误报 INFRA（#259 canary 红根因之一）。
+    uses_re = re.compile(r"^(?:\s*-\s+)?uses:\s+(\S+)", re.MULTILINE)
     # 版本化 SHA 钉扎合法集：CI-Workflows vN tag 实际指向的 commit（懒加载一次）
     tag_shas: set[str] = set()
     for repo, files in targets.items():
